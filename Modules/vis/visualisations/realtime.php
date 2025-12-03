@@ -6,28 +6,82 @@
    Emoncms - open source energy visualisation
    Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 */
+
+/**
+ * Realtime Visualization Template
+ * 
+ * This file renders a real-time streaming graph visualization that continuously
+ * updates with the latest feed data. Designed for live monitoring scenarios.
+ * 
+ * PHP Template Section:
+ * ====================
+ * This section (lines 1-31) handles:
+ * 1. Security check and global variable access
+ * 2. JavaScript library includes (Flot.js, Feed API, helpers)
+ * 3. HTML structure generation (graph container, time window controls)
+ * 4. Conditional title display (hidden when embedded)
+ * 
+ * Parameters Received from Controller:
+ * ====================================
+ * The vis_controller.php passes validated parameters:
+ * - $feedid: Feed ID (integer, validated, must be realtime feed)
+ * - $feedidname: Feed name (string, for display)
+ * - $apikey: API key for Feed API authentication
+ * - $embed: Embed mode (0=normal, 1=fullscreen)
+ * - $kw: Boolean flag for kW conversion (0 or 1)
+ * - Optional URL parameters: colour, colourbg
+ * 
+ * Template Structure:
+ * ==================
+ * 1. Security: Checks EMONCMS_EXEC constant
+ * 2. Globals: Accesses $path, $embed, $vis_version
+ * 3. Libraries: Loads Flot.js, Feed API, helper functions
+ * 4. Conditional Title: Shows feed name only if not embedded
+ * 5. Graph Container: Creates canvas with time window selection buttons
+ * 6. JavaScript: Embedded script handles continuous data updates
+ * 
+ * Key Differences from RawData:
+ * =============================
+ * - Simpler UI: Only time window buttons, no zoom/pan controls
+ * - Real-time updates: JavaScript continuously fetches latest data point
+ * - GPU-optimized: Uses requestAnimationFrame for smooth rendering
+ * - Dynamic refresh: Update rate adjusts based on time window
+ */
     defined('EMONCMS_EXEC') or die('Restricted access');
     global $path, $embed, $vis_version;
  ?>
 
+<!-- Internet Explorer 8 compatibility: excanvas provides canvas support -->
 <!--[if IE]><script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/flot/excanvas.min.js"></script><![endif]-->
+
+<!-- Flot.js plotting library -->
 <script language="javascript" type="text/javascript" src="<?php echo $path; ?>Lib/flot/jquery.flot.merged.js"></script>
+
+<!-- Visualization helper functions: view manipulation, time window handling -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/vis.helper.js?v=<?php echo $vis_version; ?>"></script>
+
+<!-- Feed API wrapper: Provides feed.getdata() and feed.get_timevalue() functions -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Modules/feed/feed.js?v=<?php echo $vis_version; ?>"></script>
     
+<!-- Conditional title: Only show if not embedded (embed=0) -->
 <?php if (!$embed) { ?>
 <h2><?php echo tr("Realtime data:"); ?> <?php echo $feedidname; ?></h2>
 <?php } ?>
 
+<!-- Main graph container -->
 <div id="graph_bound" style="height:400px; width:100%; position:relative; ">
- <div id="graph"></div>
- <div style="position:absolute; top:20px; right:20px;  opacity:0.5;">
-   <button class="viewWindow" time="3600">1 <?php echo tr('hour') ?></button>
-   <button class="viewWindow" time="1800">30 <?php echo tr('min') ?></button>
-   <button class="viewWindow" time="900">15 <?php echo tr('min') ?></button>
-   <button class="viewWindow" time="300">5 <?php echo tr('min') ?></button>
-   <button class="viewWindow" time="60">1 <?php echo tr('min') ?></button>
- </div>
+    <!-- Graph canvas: Flot.js will render the streaming chart here -->
+    <div id="graph"></div>
+    
+    <!-- Time window selection buttons: Adjusts the time range displayed -->
+    <!-- Values are in seconds: 3600=1 hour, 1800=30 min, 900=15 min, 300=5 min, 60=1 min -->
+    <div style="position:absolute; top:20px; right:20px;  opacity:0.5;">
+        <button class="viewWindow" time="3600">1 <?php echo tr('hour') ?></button>
+        <button class="viewWindow" time="1800">30 <?php echo tr('min') ?></button>
+        <button class="viewWindow" time="900">15 <?php echo tr('min') ?></button>
+        <button class="viewWindow" time="300">5 <?php echo tr('min') ?></button>
+        <button class="viewWindow" time="60">1 <?php echo tr('min') ?></button>
+    </div>
 </div>
 
 <script id="source" language="javascript" type="text/javascript">
