@@ -8,20 +8,73 @@
     Part of the OpenEnergyMonitor project:
     http://openenergymonitor.org
     */
+    
+/**
+ * Raw Data Visualization Template
+ * 
+ * This file renders a standard time-series graph visualization for a single feed.
+ * It displays raw feed data with customizable options for styling, scaling, and data processing.
+ * 
+ * PHP Template Section:
+ * ====================
+ * This section (lines 1-55) handles:
+ * 1. Security check and global variable access
+ * 2. JavaScript library includes (Flot.js, Feed API, helpers)
+ * 3. HTML structure generation (graph container, controls, statistics panel)
+ * 4. Translation string output for UI elements
+ * 
+ * Parameters Received from Controller:
+ * ====================================
+ * The vis_controller.php passes validated parameters in the $array variable:
+ * - $feedid: Feed ID (integer, validated)
+ * - $feedidname: Feed name (string, for display)
+ * - $apikey: API key for Feed API authentication
+ * - $embed: Embed mode (0=normal, 1=fullscreen)
+ * - $valid: Validation status ("true" or error message)
+ * - Optional URL parameters: colour, colourbg, units, dp, scale, average, delta, skipmissing, fill
+ * 
+ * Template Structure:
+ * ==================
+ * 1. Security: Checks EMONCMS_EXEC constant to prevent direct access
+ * 2. Globals: Accesses $path (base URL), $embed (embed mode), $vis_version (cache busting)
+ * 3. Libraries: Loads Flot.js and dependencies, Feed API, helper functions
+ * 4. HTML: Creates graph container with navigation controls and statistics panel
+ * 5. JavaScript: Embedded script (see JavaScript section below) handles data fetching and rendering
+ * 
+ * Dependencies:
+ * ============
+ * - Flot.js: jQuery-based plotting library
+ * - feed.js: Feed API wrapper for data fetching
+ * - vis.helper.js: View manipulation and helper functions
+ * - excanvas.min.js: IE8 compatibility for canvas
+ */
     defined('EMONCMS_EXEC') or die('Restricted access');
     global $path, $embed, $vis_version;
 ?>
 
+<!-- Internet Explorer 8 compatibility: excanvas provides canvas support -->
 <!--[if IE]><script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/flot/excanvas.min.js"></script><![endif]-->
+
+<!-- Flot.js plotting library and plugins -->
 <script language="javascript" type="text/javascript" src="<?php echo $path; ?>Lib/flot/jquery.flot.merged.js"></script>
+
+<!-- Feed API wrapper: Provides feed.getdata() function for fetching time-series data -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Modules/feed/feed.js?v=<?php echo $vis_version; ?>"></script>
+
+<!-- Visualization helper functions: view manipulation, tooltips, statistics -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/vis.helper.js?v=<?php echo $vis_version; ?>"></script>
 
+<!-- Visualization title container (populated by JavaScript if not embedded) -->
 <div id="vis-title"></div>
 
+<!-- Main graph container with controls and statistics overlay -->
 <div id="graph_bound" style="height:400px; width:100%; position:relative; ">
+    <!-- Graph canvas: Flot.js will render the chart here -->
     <div id="graph"></div>
+    
+    <!-- Navigation and control buttons (positioned absolutely over graph) -->
     <div id="graph-buttons" style="position:absolute; top:18px; right:32px; opacity:0.5;">
+        <!-- Time window presets: Day, Week, Month, Year -->
         <div class='btn-group'>
             <button class='btn graph-time' type='button' time='1'>D</button>
             <button class='btn graph-time' type='button' time='7'>W</button>
@@ -29,6 +82,7 @@
             <button class='btn graph-time' type='button' time='365'>Y</button>
         </div>
 
+        <!-- Zoom and pan controls (hidden by default, shown on hover) -->
         <div class='btn-group' id='graph-navbar' style='display: none;'>
             <button class='btn graph-nav' id='zoomin'>+</button>
             <button class='btn graph-nav' id='zoomout'>-</button>
@@ -36,21 +90,24 @@
             <button class='btn graph-nav' id='right'>></button>
         </div>
 
+        <!-- Fullscreen toggle -->
         <div class='btn-group'>
             <button class='btn graph-exp' id='graph-fullscreen' type='button'><i class='icon-resize-full'></i></button>
         </div>
     </div>
+    
+    <!-- Statistics overlay: Shows current value at cursor position -->
     <h3 style="position:absolute; top:0px; left:32px;"><span id="stats"></span></h3>
 </div>
 
+<!-- Statistics panel: Detailed statistics for current view (hidden by default) -->
 <div id="info" style="padding:20px; margin:25px; background-color:rgb(245,245,245); font-style:italic; display:none">
-
+    <!-- Statistics are populated by JavaScript draw() function -->
     <p><b><?php echo tr("Mean:") ?></b> <span id="stats-mean"></span></p>
     <p><b><?php echo tr("Min:") ?></b> <span id="stats-min"></span></p>
     <p><b><?php echo tr("Max:") ?></b> <span id="stats-max"></span></p>
     <p><b><?php echo tr("Standard deviation:") ?></b> <span id="stats-stdev"></span></p>
     <p><b><?php echo tr("Datapoints in view:") ?></b> <span id="stats-npoints"></span></p>
-
 </div>
 
 <script id="source" language="javascript" type="text/javascript">
