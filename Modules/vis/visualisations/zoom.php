@@ -6,37 +6,85 @@
     Emoncms - open source energy visualisation
     Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 */
+
+/**
+ * Zoom Visualization Template (kWh/d Zoomer)
+ * 
+ * This file renders an interactive zoomable graph showing power (kW) and daily energy (kWh/d).
+ * Features hierarchical zooming: click on a bar to zoom into that time period.
+ * 
+ * PHP Template Section:
+ * ====================
+ * This section handles:
+ * 1. Security check and global variable access
+ * 2. JavaScript library includes (Flot.js, date utilities, Feed API, helpers)
+ * 3. HTML structure generation (hierarchical graph container, navigation controls)
+ * 4. Conditional title display
+ * 
+ * Parameters Received from Controller:
+ * ====================================
+ * - $power: Power feed ID (integer, validated, must be realtime feed)
+ * - $kwhd: Daily energy feed ID (integer, validated, accepts realtime or daily feed)
+ * - $feedidname: Feed name (string, for display)
+ * - $apikey: API key for Feed API authentication
+ * - $embed: Embed mode (0=normal, 1=fullscreen)
+ * - Optional URL parameters: currency, currency_after_val, pricekwh, delta
+ * 
+ * Key Features:
+ * ============
+ * - Hierarchical zooming: Click bars to drill down into time periods
+ * - Dual data display: Shows both power (kW) and daily energy (kWh/d)
+ * - Cost calculation: Displays energy costs based on pricekwh parameter
+ * - Date navigation: Uses daysmonthsyears.js for date range calculations
+ * - Breadcrumb navigation: "Back" button to return to previous zoom level
+ */
     defined('EMONCMS_EXEC') or die('Restricted access');
     global $path, $embed, $vis_version;
 ?>
 
+<!-- Internet Explorer 8 compatibility -->
 <!--[if IE]><script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/flot/excanvas.min.js"></script><![endif]-->
+
+<!-- Flot.js plotting library -->
 <script language="javascript" type="text/javascript" src="<?php echo $path; ?>Lib/flot/jquery.flot.merged.js"></script>
 
+<!-- Date utility functions: Used for calculating days, months, years ranges -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Modules/vis/visualisations/common/daysmonthsyears.js?v=3"></script>
+
+<!-- Feed API wrapper: Provides feed.getdata() function -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Modules/feed/feed.js?v=<?php echo $vis_version; ?>"></script>
+
+<!-- Visualization helper functions: view manipulation, zoom handling -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/vis.helper.js?v=<?php echo $vis_version; ?>"></script>
 
+<!-- Conditional title: Only show if not embedded -->
 <?php if (!$embed) { ?>
 <h2><?php echo tr("kWh/d Zoomer"); ?></h2>
 <?php } ?>
 
+<!-- Main graph container with hierarchical zoom support -->
 <div id="placeholder_bound" style="width:100%; height:400px; position:relative; ">
+    <!-- Status/loading indicator: Shows current zoom level and loading state -->
     <div style="position:absolute; top:10px; left:0px; width:100%;">
         &nbsp;&nbsp;<span id="out2">Loading...</span><span id="out"></span>
     </div>
     
+    <!-- Graph canvas: Flot.js renders bars here, clickable for zooming -->
     <div id="placeholder" style="top: 30px; left:0px;"></div>
     
+    <!-- Bottom information panel: Shows Y-axis label and summary statistics -->
     <div style="position:relative; width:100%; bottom:-30px;">&nbsp;&nbsp;&nbsp;&nbsp;
         <small id="axislabely"></small><br>&nbsp;&nbsp;<span id="bot_out"></span>
     </div>
     
+    <!-- Navigation controls (hidden by default, shown on hover) -->
     <div id="graph-buttons" style="position:absolute; top:45px; right:32px; opacity:0.5; display: none;">
+        <!-- Back button: Returns to previous zoom level in hierarchy -->
         <div class='btn-group' id="graph-return">
             <button class='btn graph-return' id="return">Back</button>
         </div>
         
+        <!-- Time window presets: Day, Week, Month, Year -->
         <div class='btn-group'>
             <button class='btn graph-time' time='1'>D</button>
             <button class='btn graph-time' time='7'>W</button>
@@ -44,6 +92,7 @@
             <button class='btn graph-time' time='365'>Y</button>
         </div>
         
+        <!-- Zoom and pan controls -->
         <div class='btn-group' id='graph-navbar' style='display: none;'>
             <button class='btn graph-nav' id='zoomin'>+</button>
             <button class='btn graph-nav' id='zoomout'>-</button>
@@ -51,6 +100,7 @@
             <button class='btn graph-nav' id='right'>></button>
         </div>
 
+        <!-- Fullscreen toggle -->
         <div class='btn-group'>
             <button class='btn graph-exp' id='graph-fullscreen' type='button'><i class='icon-resize-full'></i></button>
         </div>
