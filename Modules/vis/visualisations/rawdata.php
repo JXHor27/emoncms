@@ -54,14 +54,36 @@
 </div>
 
 <script id="source" language="javascript" type="text/javascript">
+/**
+ * Raw Data Visualization - Embedded JavaScript
+ * 
+ * This script handles rendering a single feed's raw time-series data.
+ * It provides interactive zooming, panning, and statistical analysis.
+ * 
+ * Data Flow:
+ * 1. User interaction (zoom/pan/time selection) triggers draw()
+ * 2. draw() calculates optimal interval and calls feed.getdata()
+ * 3. feed.getdata() makes synchronous AJAX request to Feed API
+ * 4. Data is processed (scaled if needed) and statistics calculated
+ * 5. plot() renders the graph using Flot.js
+ * 
+ * Note: This uses SYNCHRONOUS feed.getdata() call (no callback)
+ * The request blocks until data is received.
+ * 
+ * Error Handling:
+ * - feed.getdata() returns empty array on error
+ * - Statistics functions handle empty data gracefully
+ * - Graph simply won't display if no data received
+ */
 
-var feedid = <?php echo $feedid; ?>;
-var feedname = "<?php echo $feedidname; ?>";
-var apikey = "<?php echo $apikey; ?>";
-feed.apikey = apikey;
-var embed = <?php echo $embed; ?>;
-var valid = "<?php echo $valid; ?>";
-var previousPoint = false;
+// Extract parameters from PHP (set by vis_controller.php)
+var feedid = <?php echo $feedid; ?>;              // Feed ID number
+var feedname = "<?php echo $feedidname; ?>";      // Feed name for display
+var apikey = "<?php echo $apikey; ?>";            // API key for Feed API authentication
+feed.apikey = apikey;                              // Set API key in feed object
+var embed = <?php echo $embed; ?>;                 // Embed mode: 0=normal, 1=fullscreen
+var valid = "<?php echo $valid; ?>";               // Validation status from controller
+var previousPoint = false;                        // Track last hovered point for tooltip
 
 var plotColour = urlParams.colour;
     if (plotColour==undefined || plotColour=='') plotColour = "EDC240";
@@ -161,42 +183,117 @@ $(function() {
         }
     });
 
+    /**
+     * Fetches and processes feed data, then renders the graph.
+     * 
+     * This function is called whenever the time window changes (zoom, pan, time selection).
+     * It:
+     * 1. Calculates optimal data interval based on time window
+     * 2. Fetches data synchronously from Feed API
+     * 3. Applies scaling if configured
+     * 4. Calculates statistics (mean, min, max, std dev)
+     * 5. Updates UI with statistics
+     * 6. Renders the graph
+     * 
+     * AJAX Pattern:
+     * - Uses SYNCHRONOUS feed.getdata() call (blocks until data received)
+     * - No callback function - data is returned directly
+     * - Returns empty array [] on error (check data.length)
+     * 
+     * Error Handling:
+     * - feed.getdata() returns [] on error (check data.length > 0)
+     * - stats() function handles empty arrays gracefully
+     * - Graph won't display if no data (empty plot)
+     */
     function draw()
     {   
+        // Calculate optimal data interval: aim for ~2400 data points
+        // This balances detail vs. performance
         view.calc_interval(2400);
+        
+        /**
+         * Synchronous AJAX call to fetch feed data
+         * 
+         * feed.getdata() Parameters:
+         * @param {number} feedid - Feed ID to fetch
+         * @param {number} view.start - Start timestamp (milliseconds)
+         * @param {number} view.end - End timestamp (milliseconds)
+         * @param {number} view.interval - Data interval in seconds (calculated above)
+         * @param {number} average - Average mode: 0=off, 1=on
+         * @param {number} delta - Delta mode: 0=off, 1=on (calculate differences)
+         * @param {number} skipmissing - Skip missing data: 0=include nulls, 1=skip nulls
+         * @param {number} 1 - Limit interval mode: enabled
+         * 
+         * Returns: Array of [timestamp, value] pairs
+         *   Format: [[timestamp1, value1], [timestamp2, value2], ...]
+         *   Returns [] (empty array) on error
+         * 
+         * Note: This is SYNCHRONOUS - execution blocks until data is received
+         * For async version, use feed.getdata() with callback parameter
+         */
         data = feed.getdata(feedid,view.start,view.end,view.interval,average,delta,skipmissing,1);
         
+        // Apply scaling if configured (scale != 1)
+        // This allows unit conversion (e.g., W to kW)
         var out = [];
-        
         if (scale!=1) {
             for (var z=0; z<data.length; z++) {
-                var val = data[z][1] * scale;
-                out.push([data[z][0],val]);
+                var val = data[z][1] * scale;  // Multiply value by scale factor
+                out.push([data[z][0],val]);    // Keep timestamp, scale value
             }
             data = out;
         } 
        
+        // Calculate statistics from data
+        // stats() function is defined in vis.helper.js
         var s = stats(data);
-        $("#stats-mean").html(s.mean.toFixed(dp)+units);
-        $("#stats-min").html(s.minval.toFixed(dp)+units);
-        $("#stats-max").html(s.maxval.toFixed(dp)+units);
-        $("#stats-stdev").html(s.stdev.toFixed(dp)+units);
-        $("#stats-npoints").html(data.length);
+        
+        // Update statistics display in UI
+        $("#stats-mean").html(s.mean.toFixed(dp)+units);      // Mean value
+        $("#stats-min").html(s.minval.toFixed(dp)+units);     // Minimum value
+        $("#stats-max").html(s.maxval.toFixed(dp)+units);     // Maximum value
+        $("#stats-stdev").html(s.stdev.toFixed(dp)+units);    // Standard deviation
+        $("#stats-npoints").html(data.length);                 // Number of data points
+        
+        // Render the graph with processed data
         plot();
     }
     
+    /**
+     * Renders the graph using Flot.js plotting library.
+     * 
+     * Creates a single line series from the data array and renders it
+     * with the configured styling options.
+     * 
+     * @see data - Global array of [timestamp, value] pairs, set by draw()
+     * @see plotColour - Global color variable, set from URL parameters
+     * @see fill - Global fill option, determines if area under line is filled
+     */
     function plot()
     {
         var options = {
-            canvas: true,
-            lines: { fill: fill },
-            xaxis: { mode: "time", timezone: "browser", min: view.start, max: view.end, minTickSize: [view.interval, "second"] },
-            //yaxis: { min: 0 },
-            grid: {hoverable: true, clickable: true},
-            selection: { mode: "x" },
-            touch: { pan: "x", scale: "x" }
+            canvas: true,                    // Use HTML5 canvas for rendering
+            lines: { fill: fill },            // Fill area under line if enabled
+            xaxis: { 
+                mode: "time",                // X-axis displays time
+                timezone: "browser",         // Use browser's timezone
+                min: view.start,             // Minimum time
+                max: view.end,               // Maximum time
+                minTickSize: [view.interval, "second"]  // Minimum tick spacing
+            },
+            //yaxis: { min: 0 },              // Optional: uncomment to set Y-axis minimum
+            grid: {
+                hoverable: true,             // Enable hover tooltips
+                clickable: true              // Enable click selection
+            },
+            selection: { mode: "x" },         // Allow selecting time range by dragging
+            touch: { 
+                pan: "x",                    // Allow panning on touch devices (x-axis)
+                scale: "x"                   // Allow pinch-to-zoom (x-axis)
+            }
         }
 
+        // Render single line series with data and color
         $.plot(placeholder, [{data:data,color: plotColour}], options);
     }
 
