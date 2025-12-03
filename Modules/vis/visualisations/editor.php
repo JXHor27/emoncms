@@ -6,30 +6,83 @@
     Emoncms - open source energy visualisation
     Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 */
+
+/**
+ * Editor Visualization Template (Feed Data Editor)
+ * 
+ * This file renders an interactive feed data editor for manual corrections.
+ * Allows users to edit, add, delete, and bulk modify feed datapoints.
+ * 
+ * PHP Template Section:
+ * ====================
+ * This section handles:
+ * 1. Security check and global variable access
+ * 2. JavaScript library includes (Flot.js, Feed API, helpers)
+ * 3. HTML structure generation (editable graph, input controls, CSV import/export)
+ * 4. Conditional UI display (some controls hidden when embedded)
+ * 5. Feed type determination ($type = 1 for realtime feeds)
+ * 
+ * Parameters Received from Controller:
+ * ====================================
+ * - $feedid: Feed ID (integer, validated, must be realtime feed)
+ * - $feedidname: Feed name (string, for display)
+ * - $apikey: API key for Feed API authentication
+ * - $embed: Embed mode (0=normal, 1=fullscreen)
+ * - $type: Feed type (1 = realtime feed, set in template)
+ * 
+ * Key Features:
+ * ============
+ * - Point editing: Click datapoint to select, edit value
+ * - Point addition: Add new datapoints at specific timestamps
+ * - Bulk operations: Multiply all data in window by factor
+ * - Data deletion: Delete all data in current time window
+ * - CSV import/export: Import and export feed data as CSV
+ * - Interactive graph: Click points to select for editing
+ * 
+ * Important:
+ * ==========
+ * Editor functionality requires full screen mode (embed=1) for proper operation.
+ * See README.md "Edition Facilities" section for details.
+ */
     defined('EMONCMS_EXEC') or die('Restricted access');
     global $path, $embed, $vis_version;
 
+    // Feed type: 1 = realtime feed (PhpFina engine)
     $type = 1;
 ?>
 
+<!-- Internet Explorer 8 compatibility -->
 <!--[if IE]><script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/flot/excanvas.min.js"></script><![endif]-->
+
+<!-- Flot.js plotting library -->
 <script language="javascript" type="text/javascript" src="<?php echo $path; ?>Lib/flot/jquery.flot.merged.js"></script>
+<!-- Feed API wrapper: Provides feed.getdata() and feed.update() functions -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Modules/feed/feed.js?v=<?php echo $vis_version; ?>"></script>
+
+<!-- Visualization helper functions: view manipulation, point selection -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/vis.helper.js?v=<?php echo $vis_version; ?>"></script>
 
+<!-- Conditional UI: Only show instructions if not embedded -->
 <?php if (!$embed) { ?>
 <h3><?php echo tr("Datapoint editor:"); ?> <span id="feed_name"></span></h3>
 <p><?php echo tr("Click on a datapoint to select, then in the edit box below the graph enter in the new value. You can also add another datapoint by changing the time to a point in time that does not yet have a datapoint."); ?></p>
 <?php } ?>
 
+<!-- Main editable graph container -->
 <div id="graph_bound" style="width:100%; position:relative; margin-bottom:10px">
+    <!-- Graph canvas: Flot.js renders graph, points are clickable for selection -->
     <div id="graph"></div>
+    
+    <!-- Navigation controls -->
     <div id="graph-buttons" style="position:absolute; top:18px; right:42px">
         <div class='btn-group'>
+            <!-- Time window presets: Day, Week, Month, Year -->
             <button class='btn graph-time' type='button' time='1'>D</button>
             <button class='btn graph-time' type='button' time='7'>W</button>
             <button class='btn graph-time' type='button' time='30'>M</button>
             <button class='btn graph-time' type='button' time='365'>Y</button>
+            
+            <!-- Zoom and pan controls -->
             <button class='btn graph-nav' id='zoomin'>+</button>
             <button class='btn graph-nav' id='zoomout'>-</button>
             <button class='btn graph-nav' id='left'><</button>
@@ -37,16 +90,20 @@
         </div>
 
     </div>
+    <!-- Statistics overlay: Shows current value at cursor position -->
     <h3 style="position:absolute; top:0px; left:32px;"><span id="stats"></span></h3>
 </div>
 
+<!-- Alert message: Shows feedback for operations -->
 <div class="alert alert-info" id="alert"></span> seconds</div>
 
+<!-- Feed selector: Choose which feed to edit -->
 <div class="input-prepend" style="margin-right:10px"> 
     <span class="add-on"><?php echo tr("Select feed"); ?></span>
     <select id="feedselector"></select>
 </div>
 
+<!-- Datapoint editor: Edit value at specific timestamp -->
 <div id="dp-edit" class="input-prepend input-append" style="margin-right:10px"> 
     <span class="add-on"><?php echo tr("Edit feed @ time"); ?></span>
     <input type="text" id="time" style="width:100px;" value="" />
@@ -55,24 +112,29 @@
     <button id="okb" class="btn btn-info"><?php echo tr('Save'); ?></button>
 </div>
 
+<!-- Bulk operation: Multiply all data in current window -->
 <div class="input-prepend input-append">
     <span class="add-on"><?php echo tr("Multiply data in the window by a float or a fraction"); ?>
     <i class="icon icon-question-sign" style="cursor:pointer; margin-top:-1px" title="<?php echo tr("To erase all the window with NAN > type NAN - To convert all the window to absolute values > type abs(x)"); ?>"></i></span>
     <input type="text" id="multiplyvalue" style="width:150px;" value="" />
     <button id="multiply-submit" class="btn btn-info"><?php echo tr('Save'); ?></button>
 </div>
+
+<!-- Delete operation: Only shown if not embedded -->
 <?php if (!$embed) { ?>
 <div class="input-prepend input-append">
     <button id="delete-button" class="btn btn-danger"><i class="icon-trash"></i> <?php echo tr('Delete data in window'); ?></button>
 </div>
 <?php } ?>
 
+<!-- CSV import/export controls -->
 <div style="margin-top:10px">
     <button id="show-csv" class="btn btn-info"><i class="icon-download-alt icon-white"></i> <span id="show-csv-text"><?php echo tr('Show CSV'); ?></span></button>
-    <!-- save csv -->
+    <!-- CSV import button (shown when CSV is displayed) -->
     <a id="save-csv" class="btn btn-warning" style="display:none"><?php echo tr('Import CSV'); ?></a>
 </div>
 
+<!-- CSV textarea: Display and edit CSV data -->
 <textarea id="csv" style="width:100%; height:200px; margin-top:10px; display:none"></textarea>
 
 

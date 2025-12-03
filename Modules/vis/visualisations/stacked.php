@@ -6,24 +6,72 @@
     Emoncms - open source energy visualisation
     Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 */
+
+/**
+ * Stacked Visualization Template
+ * 
+ * This file renders a stacked area chart comparing two feeds (bottom and top).
+ * Uses Flot.js stack plugin to create layered area visualization.
+ * 
+ * PHP Template Section:
+ * ====================
+ * This section handles:
+ * 1. Security check and global variable access
+ * 2. JavaScript library includes (Flot.js, stack plugin, Feed API, date utilities, helpers)
+ * 3. HTML structure generation (stacked chart container, loading overlay)
+ * 4. Conditional title display
+ * 
+ * Parameters Received from Controller:
+ * ====================================
+ * - $bottom: Bottom feed ID (integer, validated, accepts realtime or daily feed)
+ * - $top: Top feed ID (integer, validated, accepts realtime or daily feed)
+ * - $apikey: API key for Feed API authentication
+ * - $embed: Embed mode (0=normal, 1=fullscreen)
+ * - Optional URL parameters: colourt (top color), colourb (bottom color), delta
+ * 
+ * Key Features:
+ * ============
+ * - Stacked area chart: Two feeds displayed as stacked layers
+ * - Color customization: Separate colors for top and bottom layers
+ * - Loading indicator: Shows overlay while data is being fetched
+ * - Date range utilities: Uses daysmonthsyears.js for time calculations
+ */
 defined('EMONCMS_EXEC') or die('Restricted access');
 global $path, $embed, $vis_version;
 ?>
+<!-- Internet Explorer 8 compatibility -->
 <!--[if IE]><script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/flot/excanvas.min.js"></script><![endif]-->
+
+<!-- Flot.js plotting library -->
 <script language="javascript" type="text/javascript" src="<?php echo $path; ?>Lib/flot/jquery.flot.merged.js"></script>
+
+<!-- Flot.js stack plugin: Enables stacked area chart rendering -->
 <script language="javascript" type="text/javascript" src="<?php echo $path; ?>Lib/flot/jquery.flot.stack.min.js"></script>
 
+<!-- Feed API wrapper: Provides feed.getdata() function -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Modules/feed/feed.js?v=<?php echo $vis_version; ?>"></script>
+
+<!-- Visualization helper functions: view manipulation -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/vis.helper.js?v=<?php echo $vis_version; ?>"></script>
+
+<!-- Date utility functions: Used for calculating days, months, years ranges -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Modules/vis/visualisations/common/daysmonthsyears.js?v=2"></script>
+
+<!-- Conditional title: Only show if not embedded -->
 <?php if (!$embed) { ?>
 <h2><?php echo tr("Stacked"); ?></h2>
 <?php } ?>
 
+<!-- Main stacked chart container -->
 <div id="graph_bound" style="width:100%; height:400px; position:relative; ">
-        <div id="graph"></div>
-        <div id="loading" style="position:absolute; top:0px; left:0px; width:100%; height:100%; background-color: rgba(255,255,255,0.5);"></div>
-        <h2 style="position:absolute; top:0px; left:40px;"><span id="out"></span></h2>
+    <!-- Stacked area chart canvas: Flot.js will render stacked layers here -->
+    <div id="graph"></div>
+    
+    <!-- Loading overlay: Shown while data is being fetched -->
+    <div id="loading" style="position:absolute; top:0px; left:0px; width:100%; height:100%; background-color: rgba(255,255,255,0.5);"></div>
+    
+    <!-- Status display: Shows current view information -->
+    <h2 style="position:absolute; top:0px; left:40px;"><span id="out"></span></h2>
 </div>
 
 <script id="source" language="javascript" type="text/javascript">
