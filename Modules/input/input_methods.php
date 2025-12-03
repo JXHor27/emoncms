@@ -34,6 +34,184 @@ class InputMethods
         $this->device = $device;
     }
 
+    // ------------------------------------------------------------------------------------
+    // input/post method
+    //
+    // input/post.json?node=10&json={power1:100,power2:200,power3:300}
+    // input/post.json?node=10&csv=100,200,300
+    // ------------------------------------------------------------------------------------
+    public function post($userid)
+    {
+        global $route,$param;
+
+        $nodeid = 0;
+        if ($route->subaction) {
+            $nodeid = $route->subaction;
+        } elseif ($param->exists('node')) {
+            $nodeid = $param->val('node');
+        }
+
+        $payload = $this->parse_payload($param);
+        if (isset($payload['error'])) return $payload['error'];
+
+        if ($param->exists('time')) {
+            $time = $this->parse_time($param->val('time'));
+        } elseif (isset($payload['time'])) {
+            $time = $this->parse_time($payload['time']);
+        } else {
+            $time = time();
+        }
+
+        $result = $this->process_node($userid,$time,$nodeid,$payload['inputs']);
+        if ($result!==true) return $result;
+
+        return "ok";
+    }
+
+    /*
+
+    input/bulk.json?data=[[0,16,1137],[2,17,1437,3164],[4,19,1412,3077]]
+
+    The first number of each node is the time offset (see below).
+
+    The second number is the node id, this is the unique identifer for the wireless node.
+
+    All the numbers after the first two are data values. The first node here (node 16) has only one data value: 1137.
+
+    Optional offset and time parameters allow the sender to set the time
+    reference for the packets.
+    If none is specified, it is assumed that the last packet just arrived.
+    The time for the other packets is then calculated accordingly.
+
+    offset=-10 means the time of each packet is relative to [now -10 s].
+    time=1387730127 means the time of each packet is relative to 1387730127
+    (number of seconds since 1970-01-01 00:00:00 UTC)
+
+    Examples:
+
+    // legacy mode: 4 is 0, 2 is -2 and 0 is -4 seconds to now.
+      input/bulk.json?data=[[0,16,1137],[2,17,1437,3164],[4,19,1412,3077]]
+    // offset mode: -6 is -16 seconds to now.
+      input/bulk.json?data=[[-10,16,1137],[-8,17,1437,3164],[-6,19,1412,3077]]&offset=-10
+    // time mode: -6 is 1387730121
+      input/bulk.json?data=[[-10,16,1137],[-8,17,1437,3164],[-6,19,1412,3077]]&time=1387730127
+    // sentat (sent at) mode:
+      input/bulk.json?data=[[520,16,1137],[530,17,1437,3164],[535,19,1412,3077]]&offset=543
+
+    See pull request for full discussion:
+    https://github.com/emoncms/emoncms/pull/118
+    */
+    public function bulk($userid)
+    {
+        global $param;
+
+        $data = $param->val('data');
+
+        if ($param->exists('cb')) {
+            // data is compressed binary format
+            $data = file_get_contents('php://input');
+            $data = @gzuncompress($data);
+        } elseif ($param->exists('c')) {
+            // data is compressed hex format
+            $bindata = hex2bin($data);
+            if (!$bindata) {
+                return "Format error, compressed hex not valid";
+            }
+            $data = @gzuncompress($bindata);
+        }
+        if ($data===null) return "Format error, json string supplied is not valid";
+        $data = json_decode($data);
+        if (!is_array($data) || count($data)==0) return "Format error, json string supplied is not valid";
+
+        $len = count($data);
+        if (!isset($data[$len-1][0])) return "Format error, last item in bulk data does not contain any data";
+
+        $time_ref = time() - (int) $data[$len-1][0];
+
+        // Sent at mode: input/bulk.json?data=[[45,16,1137],[50,17,1437,3164],[55,19,1412,3077]]&sentat=60
+        if ($param->exists('sentat')) {
+            $time_ref = time() - (int) $param->val('sentat');
+        }
+        // Offset mode: input/bulk.json?data=[[-10,16,1137],[-8,17,1437,3164],[-6,19,1412,3077]]&offset=-10
+        elseif ($param->exists('offset')) {
+            $time_ref = time() - (int) $param->val('offset');
+        }
+        // Time mode: input/bulk.json?data=[[-10,16,1137],[-8,17,1437,3164],[-6,19,1412,3077]]&time=1387729425
+        elseif ($param->exists('time')) {
+            $parsed = $this->parse_time($param->val('time'), false);
+            if ($parsed === null) return "Format error, time parameter not valid";
+            $time_ref = $parsed;
+        }
+
+        $packets = array();
+        foreach ($data as $item)
+        {
+            if (!is_array($item) || count($item)<3) {
+                continue;
+            }
+
+            $packet_time = isset($item[0]) ? (int) $item[0] : 0;
+            if (!is_object($item[1])) {
+                $nodeid = $item[1];
+            } else {
+                return "Format error, node must not be an object";
+            }
+            if ($nodeid=="") $nodeid = 0;
+
+            $inputs = array();
+            $name = 1;
+            for ($i=2; $i<count($item); $i++)
+            {
+                $value = $item[$i];
+                if (is_object($value))
+                {
+                    foreach ($value as $key=>$val) {
+                        $inputs[$key] = (float) $val;
+                    }
+                    continue;
+                }
+                if ($value===null || strlen($value))
+                {
+                    $inputs[$name] = (float) $value;
+                }
+                $name ++;
+            }
+
+            $packets[] = array(
+                'time' => $time_ref + $packet_time,
+                'nodeid' => $nodeid,
+                'inputs' => $inputs
+            );
+        }
+
+        foreach ($packets as $packet) {
+            $result = $this->process_node($userid,$packet['time'],$packet['nodeid'],$packet['inputs']);
+            if ($result!==true) return $result;
+        }
+
+        return "ok";
+    }
+
+    // ------------------------------------------------------------------------------------
+    // Register and process the inputs for the node given
+    // This function is used by all input methods
+    // ------------------------------------------------------------------------------------
+    public function process_node($userid,$time,$nodeid,$inputs)
+    {
+        $dbinputs = $this->input->get_inputs($userid);
+        $nodeid = preg_replace('/[^\p{N}\p{L}_\s\-.]/u','',$nodeid);
+        if ($nodeid=="") $nodeid = 0;
+
+        $validate = $this->input->validate_access($dbinputs, $nodeid);
+        if (!$validate['success']) return "Error: ".$validate['message'];
+
+        $this->ensure_node_and_device($userid, $nodeid, $dbinputs);
+        $this->update_device_ip($userid, $nodeid);
+        $this->process_inputs($userid, $time, $nodeid, $inputs, $dbinputs);
+
+        return true;
+    }
+
     private function parse_time($inputtime, $fallbackNow = true)
     {
         if ($inputtime === null) {
@@ -263,7 +441,6 @@ class InputMethods
         return ['inputs' => $inputs];
     }
 
-
     private function ensure_node_and_device($userid, $nodeid, &$dbinputs)
     {
         if (!isset($dbinputs[$nodeid])) {
@@ -306,182 +483,4 @@ class InputMethods
         foreach ($to_process as $i) $this->process->input($time, $i['value'], $i['processList'], $i['opt']);
     }
 
-
-    // ------------------------------------------------------------------------------------
-    // input/post method
-    //
-    // input/post.json?node=10&json={power1:100,power2:200,power3:300}
-    // input/post.json?node=10&csv=100,200,300
-    // ------------------------------------------------------------------------------------
-    public function post($userid)
-    {
-        global $route,$param;
-
-        $nodeid = 0;
-        if ($route->subaction) {
-            $nodeid = $route->subaction;
-        } elseif ($param->exists('node')) {
-            $nodeid = $param->val('node');
-        }
-
-        $payload = $this->parse_payload($param);
-        if (isset($payload['error'])) return $payload['error'];
-
-        if ($param->exists('time')) {
-            $time = $this->parse_time($param->val('time'));
-        } elseif (isset($payload['time'])) {
-            $time = $this->parse_time($payload['time']);
-        } else {
-            $time = time();
-        }
-
-        $result = $this->process_node($userid,$time,$nodeid,$payload['inputs']);
-        if ($result!==true) return $result;
-
-        return "ok";
-    }
-
-    /*
-
-    input/bulk.json?data=[[0,16,1137],[2,17,1437,3164],[4,19,1412,3077]]
-
-    The first number of each node is the time offset (see below).
-
-    The second number is the node id, this is the unique identifer for the wireless node.
-
-    All the numbers after the first two are data values. The first node here (node 16) has only one data value: 1137.
-
-    Optional offset and time parameters allow the sender to set the time
-    reference for the packets.
-    If none is specified, it is assumed that the last packet just arrived.
-    The time for the other packets is then calculated accordingly.
-
-    offset=-10 means the time of each packet is relative to [now -10 s].
-    time=1387730127 means the time of each packet is relative to 1387730127
-    (number of seconds since 1970-01-01 00:00:00 UTC)
-
-    Examples:
-
-    // legacy mode: 4 is 0, 2 is -2 and 0 is -4 seconds to now.
-      input/bulk.json?data=[[0,16,1137],[2,17,1437,3164],[4,19,1412,3077]]
-    // offset mode: -6 is -16 seconds to now.
-      input/bulk.json?data=[[-10,16,1137],[-8,17,1437,3164],[-6,19,1412,3077]]&offset=-10
-    // time mode: -6 is 1387730121
-      input/bulk.json?data=[[-10,16,1137],[-8,17,1437,3164],[-6,19,1412,3077]]&time=1387730127
-    // sentat (sent at) mode:
-      input/bulk.json?data=[[520,16,1137],[530,17,1437,3164],[535,19,1412,3077]]&offset=543
-
-    See pull request for full discussion:
-    https://github.com/emoncms/emoncms/pull/118
-    */
-    public function bulk($userid)
-    {
-        global $param;
-
-        $data = $param->val('data');
-
-        if ($param->exists('cb')) {
-            // data is compressed binary format
-            $data = file_get_contents('php://input');
-            $data = @gzuncompress($data);
-        } elseif ($param->exists('c')) {
-            // data is compressed hex format
-            $bindata = hex2bin($data);
-            if (!$bindata) {
-                return "Format error, compressed hex not valid";
-            }
-            $data = @gzuncompress($bindata);
-        }
-        if ($data===null) return "Format error, json string supplied is not valid";
-        $data = json_decode($data);
-        if (!is_array($data) || count($data)==0) return "Format error, json string supplied is not valid";
-
-        $len = count($data);
-        if (!isset($data[$len-1][0])) return "Format error, last item in bulk data does not contain any data";
-
-        $time_ref = time() - (int) $data[$len-1][0];
-
-        // Sent at mode: input/bulk.json?data=[[45,16,1137],[50,17,1437,3164],[55,19,1412,3077]]&sentat=60
-        if ($param->exists('sentat')) {
-            $time_ref = time() - (int) $param->val('sentat');
-        }
-        // Offset mode: input/bulk.json?data=[[-10,16,1137],[-8,17,1437,3164],[-6,19,1412,3077]]&offset=-10
-        elseif ($param->exists('offset')) {
-            $time_ref = time() - (int) $param->val('offset');
-        }
-        // Time mode: input/bulk.json?data=[[-10,16,1137],[-8,17,1437,3164],[-6,19,1412,3077]]&time=1387729425
-        elseif ($param->exists('time')) {
-            $parsed = $this->parse_time($param->val('time'), false);
-            if ($parsed === null) return "Format error, time parameter not valid";
-            $time_ref = $parsed;
-        }
-
-        $packets = array();
-        foreach ($data as $item)
-        {
-            if (!is_array($item) || count($item)<3) {
-                continue;
-            }
-
-            $packet_time = isset($item[0]) ? (int) $item[0] : 0;
-            if (!is_object($item[1])) {
-                $nodeid = $item[1];
-            } else {
-                return "Format error, node must not be an object";
-            }
-            if ($nodeid=="") $nodeid = 0;
-
-            $inputs = array();
-            $name = 1;
-            for ($i=2; $i<count($item); $i++)
-            {
-                $value = $item[$i];
-                if (is_object($value))
-                {
-                    foreach ($value as $key=>$val) {
-                        $inputs[$key] = (float) $val;
-                    }
-                    continue;
-                }
-                if ($value===null || strlen($value))
-                {
-                    $inputs[$name] = (float) $value;
-                }
-                $name ++;
-            }
-
-            $packets[] = array(
-                'time' => $time_ref + $packet_time,
-                'nodeid' => $nodeid,
-                'inputs' => $inputs
-            );
-        }
-
-        foreach ($packets as $packet) {
-            $result = $this->process_node($userid,$packet['time'],$packet['nodeid'],$packet['inputs']);
-            if ($result!==true) return $result;
-        }
-
-        return "ok";
-    }
-
-    // ------------------------------------------------------------------------------------
-    // Register and process the inputs for the node given
-    // This function is used by all input methods
-    // ------------------------------------------------------------------------------------
-    public function process_node($userid,$time,$nodeid,$inputs)
-    {
-        $dbinputs = $this->input->get_inputs($userid);
-        $nodeid = preg_replace('/[^\p{N}\p{L}_\s\-.]/u','',$nodeid);
-        if ($nodeid=="") $nodeid = 0;
-
-        $validate = $this->input->validate_access($dbinputs, $nodeid);
-        if (!$validate['success']) return "Error: ".$validate['message'];
-
-        $this->ensure_node_and_device($userid, $nodeid, $dbinputs);
-        $this->update_device_ip($userid, $nodeid);
-        $this->process_inputs($userid, $time, $nodeid, $inputs, $dbinputs);
-
-        return true;
-    }
 }
