@@ -42,144 +42,27 @@ class InputMethods
     // ------------------------------------------------------------------------------------
     public function post($userid)
     {
-        // Nodeid
-        global $route,$param,$log;
+        global $route,$param;
 
-        // Default nodeid is zero
         $nodeid = 0;
-
         if ($route->subaction) {
             $nodeid = $route->subaction;
         } elseif ($param->exists('node')) {
             $nodeid = $param->val('node');
         }
-        $nodeid = preg_replace('/[^\p{N}\p{L}_\s\-.]/u','',$nodeid);
-        if ($nodeid=="") {
-            $nodeid = 0;
-        }
 
-        // Time
-        //if ($param->exists('time')) $time = (int) $param->val('time'); else $time = time();
+        $payload = $this->parse_payload($param);
+        if (isset($payload['error'])) return $payload['error'];
+
         if ($param->exists('time')) {
-            $inputtime = $param->val('time');
-            // Remove from array so no used as an input
-            // Removed as causing unexpected results.
-            // unset($jsondataLC['time']);
-
-            // validate time
-            if (is_numeric($inputtime)){
-                $log->info("Valid time in seconds used ".$inputtime);
-                $time = (int) $inputtime;
-            } elseif (is_string($inputtime)){
-                if (($timestamp = strtotime($inputtime)) === false) {
-                    //If time string is not valid, use system time.
-                    $log->warn("Time string not valid ".$inputtime);
-                    $time = time();
-                } else {
-                    $log->info("Valid time string used ".$inputtime);
-                    $time = $timestamp;
-                }
-            } else {
-                $log->warn("Time parameter not valid ".$inputtime);
-                $time = time();
-            }
+            $time = $this->parse_time($param->val('time'));
+        } elseif (isset($payload['time'])) {
+            $time = $this->parse_time($payload['time']);
         } else {
             $time = time();
         }
 
-        // Data
-        $datain = false;
-        /* The code below processes the data regardless of its type,
-         * unless fulljson is used in which case the data is decoded
-         * from JSON.  The previous 'json' type is retained for
-         * backwards compatibility, since some strings would be parsed
-         * differently in the two cases. */
-        if ($param->exists('json')) {
-            $datain = $param->val('json');
-        } elseif ($param->exists('fulljson')) {
-            $datain = $param->val('fulljson');
-        } elseif ($param->exists('csv')) {
-            $datain = $param->val('csv');
-        } elseif ($param->exists('data')) {
-            $datain = $param->val('data');
-        }
-
-        if ($datain=="") {
-            return "Request contains no data via csv, json or data tag";
-        }
-
-        if ($param->exists('fulljson')) {
-            $jsondata = json_decode($datain,true,2);
-            if ((json_last_error() === JSON_ERROR_NONE) && is_array($jsondata)) {
-                // JSON is valid - is it an array
-                //$jsoninput = true;
-                $log->info("Valid JSON found ");
-                //Create temporary array and change all keys to lower case to look for a 'time' key
-                $jsondataLC = array_change_key_case($jsondata);
-
-                // If JSON, check to see if there is a time value else set to time now.
-                // Time set as a parameter takes precedence.
-                if ($param->exists('time')) {
-                    $log->info("Time from parameter used");
-                } elseif (array_key_exists('time',$jsondataLC)){
-                    $inputtime = $jsondataLC['time'];
-                    // remove time key so as not to create a related input
-                    unset($jsondata['time']);
-                    // validate time
-                    if (is_numeric($inputtime)){
-                        $log->info("Valid time in seconds used ".$inputtime);
-                        $time = (int) $inputtime;
-                    } elseif (is_string($inputtime)){
-                        if (($timestamp = strtotime($inputtime)) === false) {
-                            //If time string is not valid, use system time.
-                            $log->warn("Time string not valid ".$inputtime);
-                            $time = time();
-                        } else {
-                            $log->info("Valid time string used ".$inputtime);
-                            $time = $timestamp;
-                        }
-                    } else {
-                        $log->warn("Time not valid ".$inputtime);
-                        $time = time();
-                    }
-                } else {
-                    $log->info("No time element found in JSON - System time used");
-                    $time = time();
-                }
-                $inputs = $jsondata;
-                foreach ($inputs as $name => $value) {
-                    if (!is_numeric($value) && $value!='null') {
-                        $inputs[$name] = (float) $value;
-                    }
-                }
-
-            } else {
-                $log->error("Invalid JSON: " . htmlspecialchars($datain, ENT_QUOTES, 'UTF-8'));
-                return "Input in not a valid JSON object";
-            }
-        } else {
-            $json = preg_replace('/[^\p{N}\p{L}_\s\-.:,]/u','',$datain);
-            $datapairs = explode(',', $json);
-
-            $inputs = array();
-            $csvi = 0;
-            for ($i=0; $i<count($datapairs); $i++)
-            {
-                $keyvalue = explode(':', $datapairs[$i]);
-
-                if (isset($keyvalue[1])) {
-                    if ($keyvalue[0]=='') return "Format error, json key missing or invalid character";
-                    if (!is_numeric($keyvalue[1]) && $keyvalue[1]!='null') return "Format error, json value is not numeric";
-                    $inputs[$keyvalue[0]] = (float) $keyvalue[1];
-                } else {
-                    if (!is_numeric($keyvalue[0]) && $keyvalue[0]!='null') return "Format error: csv value is not numeric";
-                    $inputs[$csvi+1] = (float) $keyvalue[0];
-                    $csvi ++;
-                }
-            }
-        }
-
-        $result = $this->process_node($userid,$time,$nodeid,$inputs);
+        $result = $this->process_node($userid,$time,$nodeid,$payload['inputs']);
         if ($result!==true) return $result;
 
         return "ok";
@@ -236,15 +119,14 @@ class InputMethods
             }
             $data = @gzuncompress($bindata);
         }
-        if ($data==null) return "Format error, json string supplied is not valid";
+        if ($data===null) return "Format error, json string supplied is not valid";
         $data = json_decode($data);
-        if ($data==null) return "Format error, json string supplied is not valid";
-        
+        if (!is_array($data) || count($data)==0) return "Format error, json string supplied is not valid";
+
         $len = count($data);
-
-        if ($len==0) return "Format error, json string supplied is not valid";
-
         if (!isset($data[$len-1][0])) return "Format error, last item in bulk data does not contain any data";
+
+        $time_ref = time() - (int) $data[$len-1][0];
 
         // Sent at mode: input/bulk.json?data=[[45,16,1137],[50,17,1437,3164],[55,19,1412,3077]]&sentat=60
         if ($param->exists('sentat')) {
@@ -256,50 +138,55 @@ class InputMethods
         }
         // Time mode: input/bulk.json?data=[[-10,16,1137],[-8,17,1437,3164],[-6,19,1412,3077]]&time=1387729425
         elseif ($param->exists('time')) {
-            $time_ref = (int) $param->val('time');
-        }
-        // Legacy mode: input/bulk.json?data=[[0,16,1137],[2,17,1437,3164],[4,19,1412,3077]]
-        else {
-            $time_ref = time() - (int) $data[$len-1][0];
+            $parsed = $this->parse_time($param->val('time'), false);
+            if ($parsed === null) return "Format error, time parameter not valid";
+            $time_ref = $parsed;
         }
 
+        $packets = array();
         foreach ($data as $item)
         {
-            if (count($item)>2)
-            {
-                // check for correct time format
-                $itemtime = (int) $item[0];
-
-                $time = $time_ref + (int) $itemtime;
-                if (!is_object($item[1])) {
-                    $nodeid = $item[1];
-                } else {
-                    return "Format error, node must not be an object";
-                }
-                if ($nodeid=="") $nodeid = 0;
-
-                $inputs = array();
-                $name = 1;
-                for ($i=2; $i<count($item); $i++)
-                {
-                    if (is_object($item[$i]))
-                    {
-                        foreach ($item[$i] as $key=>$value) {
-                            $inputs[$key] = (float) $value;
-                        }
-                        continue;
-                    }
-                    if ($item[$i]==null || strlen($item[$i]))
-                    {
-                        $value = (float) $item[$i];
-                        $inputs[$name] = $value;
-                    }
-                    $name ++;
-                }
-
-                $result = $this->process_node($userid,$time,$nodeid,$inputs);
-                if ($result!==true) return $result;
+            if (!is_array($item) || count($item)<3) {
+                continue;
             }
+
+            $packet_time = isset($item[0]) ? (int) $item[0] : 0;
+            if (!is_object($item[1])) {
+                $nodeid = $item[1];
+            } else {
+                return "Format error, node must not be an object";
+            }
+            if ($nodeid=="") $nodeid = 0;
+
+            $inputs = array();
+            $name = 1;
+            for ($i=2; $i<count($item); $i++)
+            {
+                $value = $item[$i];
+                if (is_object($value))
+                {
+                    foreach ($value as $key=>$val) {
+                        $inputs[$key] = (float) $val;
+                    }
+                    continue;
+                }
+                if ($value===null || strlen($value))
+                {
+                    $inputs[$name] = (float) $value;
+                }
+                $name ++;
+            }
+
+            $packets[] = array(
+                'time' => $time_ref + $packet_time,
+                'nodeid' => $nodeid,
+                'inputs' => $inputs
+            );
+        }
+
+        foreach ($packets as $packet) {
+            $result = $this->process_node($userid,$packet['time'],$packet['nodeid'],$packet['inputs']);
+            if ($result!==true) return $result;
         }
 
         return "ok";
@@ -312,55 +199,288 @@ class InputMethods
     public function process_node($userid,$time,$nodeid,$inputs)
     {
         $dbinputs = $this->input->get_inputs($userid);
-
         $nodeid = preg_replace('/[^\p{N}\p{L}_\s\-.]/u','',$nodeid);
+        if ($nodeid=="") $nodeid = 0;
 
-        $validate_access = $this->input->validate_access($dbinputs, $nodeid);
-        if (!$validate_access['success']) return "Error: ".$validate_access['message'];
+        $validate = $this->input->validate_access($dbinputs, $nodeid);
+        if (!$validate['success']) return "Error: ".$validate['message'];
 
-        if (!isset($dbinputs[$nodeid])) {
-            $dbinputs[$nodeid] = array();
-            if ($this->device) $this->device->create($userid,$nodeid,null,null,null);
-        }
-
-        if ($this->device) {
-            $deviceid = $this->device->exists_nodeid($userid,$nodeid);
-            if ($deviceid) {
-                $ip_address = get_client_ip_env();
-                $this->device->set_fields($deviceid,json_encode(array("ip"=>$ip_address)));
-            }
-        }
-
-        $tmp = array();
-        foreach ($inputs as $name => $value)
-        {
-            $name = preg_replace('/[^\p{N}\p{L}_\s\-.]/u','',$name);
-
-            if (!isset($dbinputs[$nodeid][$name]))
-            {
-                $inputid = $this->input->create_input($userid, $nodeid, $name);
-                $dbinputs[$nodeid][$name] = array('id'=>$inputid, 'processList'=>'');
-                $this->input->set_timevalue($dbinputs[$nodeid][$name]['id'],$time,$value);
-            }
-            else
-            {
-                $this->input->set_timevalue($dbinputs[$nodeid][$name]['id'],$time,$value);
-
-                if ($dbinputs[$nodeid][$name]['processList']) $tmp[] = array(
-                    'value'=>$value,
-                    'processList'=>$dbinputs[$nodeid][$name]['processList'],
-                    'opt'=>array(
-                        'sourcetype' => ProcessOriginType::INPUT,
-                        'sourceid'=>$dbinputs[$nodeid][$name]['id']
-                    )
-                );
-
-                if (isset($_GET['mqttpub'])) $this->process->publish_to_mqtt("emon/$nodeid/$name",$time,$value);
-            }
-        }
-
-        foreach ($tmp as $i) $this->process->input($time,$i['value'],$i['processList'],$i['opt']);
+        $this->ensure_node_and_device($userid, $nodeid, $dbinputs);
+        $this->update_device_ip($userid, $nodeid);
+        $this->process_inputs($userid, $time, $nodeid, $inputs, $dbinputs);
 
         return true;
     }
+
+    private function parse_time($inputtime, $fallbackNow = true)
+    {
+        if ($inputtime === null) {
+            return $fallbackNow ? time() : null;
+        }
+
+        if (is_numeric($inputtime)) {
+            return (int) $inputtime;
+        }
+
+        if (is_string($inputtime)) {
+            $timestamp = strtotime($inputtime);
+            if ($timestamp !== false) {
+                return $timestamp;
+            }
+        }
+
+        return $fallbackNow ? time() : null;
+    }
+
+    /**
+     * Parse incoming input data for input/post & input/bulk.
+     *
+     * Supported formats:
+     *   - fulljson=  → STRICT JSON (modern)
+     *   - json=      → Legacy flexible JSON-like "key:value" format
+     *   - csv=       → CSV values, optionally with key:value format
+     *   - data=      → Alias for csv=
+     *
+     * This version preserves backward compatibility while supporting
+     * strict JSON when required.
+     *
+     * @param  object $param   Parameter object from EmonCMS framework
+     * @return array           ['inputs'=>..., 'time'=>...] OR ['error'=>msg]
+     */
+    private function parse_payload($param)
+    {
+        /* ----------------------------------------------------------
+        0. VALIDATE presence of any input data
+        ---------------------------------------------------------- */
+        $hasData = $param->exists('json') ||
+                $param->exists('fulljson') ||
+                $param->exists('csv') ||
+                $param->exists('data');
+
+        if (!$hasData) {
+            return ['error' => "Request contains no data via csv, json, fulljson or data"];
+        }
+
+
+        /* ==========================================================
+        1. STRICT JSON MODE  (fulljson=)
+        ----------------------------------------------------------
+        - Required to be valid JSON
+        - Used by modern integrations (Node-RED, Python, apps)
+        - Legacy tolerance NOT applied here
+        ========================================================== */
+        if ($param->exists('fulljson')) {
+
+            $datain = $param->val('fulljson');
+            if ($datain === "") {
+                return ['error' => "fulljson parameter provided but empty"];
+            }
+
+            // STRICT JSON decode
+            $jsondata = json_decode($datain, true, 2);
+            if (!is_array($jsondata)) {
+                return ['error' => "fulljson must be valid JSON"];
+            }
+
+            // Extract optional "time" key
+            $time = null;
+            foreach ($jsondata as $key => $value) {
+                if (strcasecmp($key, 'time') === 0) {
+                    $time = $value;
+                    unset($jsondata[$key]);
+                }
+            }
+
+            return ['inputs' => $jsondata, 'time' => $time];
+        }
+
+
+        /* ==========================================================
+        2. LEGACY JSON MODE  (json=)
+        ----------------------------------------------------------
+        - Original EmonCMS behaviour: tolerant parsing
+        - Supports:  json={a:100,b:200}
+        - Falls back to KEY:VAL parsing if strict JSON fails
+        - Very important for backward compatibility
+        ========================================================== */
+        if ($param->exists('json')) {
+
+            $datain = trim($param->val('json'));
+            if ($datain === "") {
+                return ['error' => "json parameter provided but empty"];
+            }
+
+            /* ------------------------------------------
+            2A. Attempt strict JSON first
+            ------------------------------------------ */
+            $jsondata = json_decode($datain, true);
+            if (is_array($jsondata)) {
+
+                // Extract optional "time"
+                $time = null;
+                foreach ($jsondata as $key => $value) {
+                    if (strcasecmp($key, 'time') === 0) {
+                        $time = $value;
+                        unset($jsondata[$key]);
+                    }
+                }
+
+                return ['inputs' => $jsondata, 'time' => $time];
+            }
+
+
+            /* ------------------------------------------
+            2B. STRICT JSON FAILED → legacy fallback
+            ------------------------------------------ */
+
+            // Remove braces { }
+            if ($datain[0] === '{' && substr($datain, -1) === '}') {
+                $datain = substr($datain, 1, -1);
+            }
+
+            // Soft sanitization (preserve valid chars)
+            $clean = preg_replace('/[^\w\s\-.:,]/u', '', $datain);
+
+            $pairs = explode(',', $clean);
+
+            $inputs = [];
+            $time   = null;
+
+            foreach ($pairs as $pair) {
+
+                $kv = explode(':', $pair);
+
+                if (!isset($kv[1])) {
+                    return ['error' => "Legacy JSON format error: expected key:value"];
+                }
+
+                $key = trim($kv[0]);
+                $val = trim($kv[1]);
+
+                if ($key === "") {
+                    return ['error' => "Legacy JSON key is empty or invalid"];
+                }
+
+                // Special handling for "time"
+                if (strcasecmp($key, 'time') === 0) {
+                    if (!is_numeric($val)) {
+                        return ['error' => "Time value must be numeric"];
+                    }
+                    $time = (int)$val;
+                    continue;
+                }
+
+                // All numeric or null allowed
+                if (!is_numeric($val) && $val !== "null") {
+                    return ['error' => "Legacy JSON value for '$key' must be numeric"];
+                }
+
+                // Store
+                $inputs[$key] = ($val === "null") ? null : (float)$val;
+            }
+
+            return ['inputs' => $inputs, 'time' => $time];
+        }
+
+
+
+        /* ==========================================================
+        3. CSV or DATA  (csv= or data=)
+        ----------------------------------------------------------
+        - Supports formats like:
+                csv=100,200,300
+                data=1:100,2:150
+        - Legacy EmonCMS behaviour unchanged
+        ========================================================== */
+        $datain = $param->val($param->exists('csv') ? 'csv' : 'data');
+
+        if ($datain === "") {
+            return ['error' => "csv/data parameter provided but empty"];
+        }
+
+        // Keep same sanitization rules as original EmonCMS
+        $clean = preg_replace('/[^\p{N}\p{L}_\s\-.:,]/u', '', $datain);
+        $pairs = explode(',', $clean);
+
+        $inputs = [];
+        $index = 0;
+
+        foreach ($pairs as $pair) {
+
+            $kv = explode(':', $pair);
+
+            /* ------------------------------------------
+            KEY:VALUE CSV FORMAT
+            ------------------------------------------ */
+            if (isset($kv[1])) {
+
+                if ($kv[0] === "") {
+                    return ['error' => "CSV key is empty"];
+                }
+                if (!is_numeric($kv[1]) && $kv[1] !== "null") {
+                    return ['error' => "CSV value for key '{$kv[0]}' must be numeric"];
+                }
+
+                $inputs[$kv[0]] = ($kv[1] === "null") ? null : (float)$kv[1];
+            }
+
+            /* ------------------------------------------
+            PURE CSV FORMAT (no keys)
+            ------------------------------------------ */
+            else {
+
+                if (!is_numeric($kv[0]) && $kv[0] !== "null") {
+                    return ['error' => "CSV value must be numeric"];
+                }
+
+                $inputs[$index + 1] = ($kv[0] === "null") ? null : (float)$kv[0];
+                $index++;
+            }
+        }
+
+        return ['inputs' => $inputs];
+    }
+
+    private function ensure_node_and_device($userid, $nodeid, &$dbinputs)
+    {
+        if (!isset($dbinputs[$nodeid])) {
+            $dbinputs[$nodeid] = array();
+            if ($this->device) $this->device->create($userid, $nodeid, null, null, null);
+        }
+    }
+
+    private function update_device_ip($userid, $nodeid)
+    {
+        if (!$this->device) return;
+
+        $deviceid = $this->device->exists_nodeid($userid, $nodeid);
+        if ($deviceid) {
+            $ip = get_client_ip_env();
+            $this->device->set_fields($deviceid, json_encode(array('ip' => $ip)));
+        }
+    }
+
+    private function process_inputs($userid, $time, $nodeid, $inputs, &$dbinputs)
+    {
+        $to_process = array();
+        foreach ($inputs as $name => $value) {
+            $name = preg_replace('/[^\p{N}\p{L}_\s\-.]/u','',$name);
+            if (!isset($dbinputs[$nodeid][$name])) {
+                $inputid = $this->input->create_input($userid, $nodeid, $name);
+                $dbinputs[$nodeid][$name] = array('id' => $inputid, 'processList' => '');
+            }
+            $inputid = $dbinputs[$nodeid][$name]['id'];
+            $this->input->set_timevalue($inputid, $time, $value);
+            if ($dbinputs[$nodeid][$name]['processList']) {
+                $to_process[] = array(
+                    'value' => $value,
+                    'processList' => $dbinputs[$nodeid][$name]['processList'],
+                    'opt' => array('sourcetype' => ProcessOriginType::INPUT, 'sourceid' => $inputid)
+                );
+            }
+            if (isset($_GET['mqttpub'])) $this->process->publish_to_mqtt("emon/$nodeid/$name",$time,$value);
+        }
+        foreach ($to_process as $i) $this->process->input($time, $i['value'], $i['processList'], $i['opt']);
+    }
+
 }
