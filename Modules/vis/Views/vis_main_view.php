@@ -38,28 +38,37 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 <h2><?php echo ctx_tr('vis_messages','Visualisations'); ?></h2>
 <div id="vispage">
 <table><tr valign="top"><td>
-    <div style="width:340px; background-color:#efefef; border: 1px solid #ddd;">
+<!--increase width of container to fit the text and dropdown on the same line-->
+    <div style="width:350px; background-color:#efefef; border: 1px solid #ddd; border-radius: 8px;">
         <div style="padding:5px;  border-top: 1px solid #fff">
-            <div style="float:left; padding-top:2px; font-weight:bold;">1) <?php echo ctx_tr('vis_messages','Select visualisation:')?> </div>
+            <div style="float:left; padding-top:2px; font-weight:bold; margin-left: 5px;"><?php echo ctx_tr('vis_messages','Select visualisation:')?> </div>
             <div style="float:right;"><span id="select"></span></div>
             <div style="clear:both"></div>
         </div>
         <div style="padding:5px;  border-top: 1px solid #fff">
-            <div style="padding-top:2px; font-weight:bold;">2) <?php echo ctx_tr('vis_messages','Set options:')?> </div><br>
+            <div style="padding-top:2px; font-weight:bold; margin-left: 5px;"><?php echo ctx_tr('vis_messages','Set options:')?> </div><br>
             <div id="box-options" ></div><br>
             <p style="font-size:12px; color:#444;"><b><?php echo ctx_tr('vis_messages','Note:');?></b> <?php echo ctx_tr('vis_messages','If a feed does not appear in the selection box, check that the type has been set on the feeds page.'); ?></p>
         </div>
         <div style="padding:5px;  border-top: 1px solid #fff">
-            <div style="float:left; padding-top:2px; font-weight:bold;">3) </div>
+            <div style="float:left; padding-top:2px; font-weight:bold; margin-left: 5px;"></div>
             <div style="float:right;">
-                <input id="viewbtn" type="button" value="<?php echo ctx_tr('vis_messages','View'); ?>" class="btn btn-info" />
-                <input id="fullscreen" type="button" value="<?php echo ctx_tr('vis_messages','Full screen'); ?>" class="btn btn-info" />
+                <input id="viewbtn" type="button" value="<?php echo ctx_tr('vis_messages','View'); ?>" class="btn btn-info" style="padding 20px; border-radius:6px; font-weight:bold;"/>
+                <input id="fullscreen" type="button" value="<?php echo ctx_tr('vis_messages','Full screen'); ?>" class="btn btn-info" style="padding 20px; border-radius:6px; font-weight:bold;"/>
+                <!--Added a minimize button to exit from full screen-->
+                <input id="minimizebtn" type="button" value="Minimize" class="btn btn-warning" style="display:none;" />
             </div>
             <div style="clear:both"></div>
         </div>
         <div style="padding:5px;  border-top: 1px solid #fff">
-            <div style="padding-top:2px; font-weight:bold;"><?php echo ctx_tr('vis_messages','Embed in your website:'); ?> </div><br>
-            <textarea id="embedcode" style="width:315px; height:120px;" readonly="readonly"></textarea>
+            <div style="padding-top:2px; font-weight:bold; margin-left: 5px;"><?php echo ctx_tr('vis_messages','Embed in your website:'); ?> </div><br>
+            
+            <!--Modified the textarea to be adjustable vertically only to improve neatness of UI-->
+            <textarea id="embedcode" 
+                style="width:315px; height:120px; max-width:340px; resize: vertical;" 
+                readonly="readonly">
+            </textarea>
+
         </div>
     </div>
 </td><td style="padding:0px 0px 0px 5px;">
@@ -70,6 +79,27 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 </div>
 <div id="visurl"></div>
 
+<!-- Added fullscreen mode styling -->
+<style>
+#vispage.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    background: #fff;
+    padding: 10px;
+    overflow: hidden;
+}
+
+#vispage.fullscreen #vis_bound {
+    width: 100% !important;
+    height: calc(100% - 40px) !important;
+}
+</style>
+
+
 <script type="application/javascript">
   var feedlist = <?php echo json_encode($feedlist); ?>;
   var widgets = <?php echo json_encode($visualisations); ?>;
@@ -77,7 +107,7 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
   var apikey = "";
   //var apikey = "<?php echo $apikey; ?>";
   
-  var out = '<select id="visselect" style="width:180px; margin:0px;">';
+  var out = '<select id="visselect" style="width:160px; margin:0px;">';
   for (z in widgets) {
     // If widget action specified: use action otherwise override with widget key
     var action = z;
@@ -139,35 +169,58 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
     else $("#embedcode").val('<?php echo addslashes(ctx_tr('vis_messages','Some of the feeds selected are not public, to embed a visualisation publicly first make the feeds that you want to use public.'));?>\n\n<?php echo ctx_tr('vis_messages','To embed privately:');?>\n\n<iframe style="width:580px; height:400px;" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="'+visurl+'&embed=1&apikey='+apikey+'"></iframe>');
   });
 
-  $("#fullscreen").click(function(){
-    var visurl = "";
-    var vistype = $("#visselect").val();
+  //Edit the fullscreen button to not open a new window, but rather expand the current view to fullscreen
+ $("#fullscreen").click(function () {
 
-    // Added in custom action for multigraph
-    // if the vis type is multigraph then we construct
-    // the visurl with multigraph?id=1
-    if (vistype=="multigraph") {
-      visurl = "multigraph?mid="+multigraphID;
-    } else {
-      visurl += path+"vis/"+vistype;
-      var options = [];
-      $(".options").each(function() {
+    $("#vispage").addClass("fullscreen");
+
+    // hide fullscreen button, show minimize
+    $("#fullscreen").hide();
+    $("#minimizebtn").show();
+
+    var width = $("#vispage").width();
+    var height = $("#vispage").height() - 40;
+
+    var vistype = $("#visselect").val();
+    var visurl = path + "vis/" + vistype;
+
+    var options = [];
+    $(".options").each(function () {
         if ($(this).val()) {
-          if ($(this).attr("type")=="color") {
-            // Since colour values are generally prefixed with "#", and "#" isn't valid in URLs, we strip out the "#".
-            // It will be replaced by the value-checking in the actual plot function, so this won't cause issues.
-            var colour = $(this).val();
-            colour = colour.replace("#","");
-            options.push($(this).attr("id")+"="+colour);
-          } else  {
-            options.push($(this).attr("id")+"="+encodeURIComponent($(this).val()));
-          }
+            if ($(this).attr("type") == "color") {
+                var colour = $(this).val().replace("#", "");
+                options.push($(this).attr("id") + "=" + colour);
+            } else {
+                options.push($(this).attr("id") + "=" + encodeURIComponent($(this).val()));
+            }
         }
-      });
-    }
-    if (options) visurl += "?"+options.join("&");
-    window.open(visurl,'_blank');
-  });
+    });
+
+    visurl += "?" + options.join("&");
+
+    $("#visiframe").html(
+        '<iframe style="width:' + width + 'px; height:' + height + 'px;" ' +
+        'frameborder="0" scrolling="no" src="' + visurl + '&embed=1"></iframe>'
+    );
+});
+
+
+  $("#minimizebtn").click(function () {
+
+    $("#vispage").removeClass("fullscreen");
+
+    // show fullscreen button again, hide minimize
+    $("#fullscreen").show();
+    $("#minimizebtn").hide();
+
+    // Restore normal sizing
+    vis_resize();
+
+    // Re-render normal view
+    $("#viewbtn").trigger("click");
+});
+
+
 
   $(window).resize(function(){vis_resize();});
 
@@ -212,7 +265,11 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
     // Change the size of the text for items with class options - size initially set by bootstrap
     // also add height of 30 px for color inputs for Firefox
     $("input[class='options'], select[class='options'], textarea[class='options']").css({'font-size':'12px'});
-    if (navigator.userAgent.search("Firefox") >= 0) {$("input[type='color']").css({'height':'30px','width':'220px'});};
+
+    // change the code below so that the resizing apply to all browser, not only firefox
+    // if (navigator.userAgent.search("Firefox") >= 0) {$("input[type='color']").css({'height':'30px','width':'220px'});};
+    $("input[type='color'].options").css({'height':'30px','width':'220px'});
+
   }
 
   // Create a drop down select box with a list of feeds.

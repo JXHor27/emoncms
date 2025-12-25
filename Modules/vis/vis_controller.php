@@ -104,8 +104,9 @@
                                 }
                             } else {
                                 $array['valid'] = false;
-                                $array['message'] = 'invalid feedid';
+                                $array['message'] = 'No feed selected. Please add data to continue.';
                             }
+
                         } elseif ($type == 4) {// Boolean
                             if (get($key) == "true" || get($key) == 1) {
                                 $array[$key] = 1;
