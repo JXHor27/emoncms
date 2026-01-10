@@ -14,18 +14,20 @@
 
     //CHAVEIRO TODO: only used in vis_main_view.php, should be php source for vis/widget/vis_render.js vis_widgetlist variable data
 
+    /* fixed some typo, added space in between words*/
+
     $visualisations = array(
     
-        'realtime' => array('label'=>ctx_tr('vis_messages','RealTime'), 'options'=>array(
+        'realtime' => array('label'=>ctx_tr('vis_messages','Real Time'), 'options'=>array(
             array('feedid',ctx_tr('vis_messages','feed'),1),
             array('colour',ctx_tr('vis_messages','colour'),9,'EDC240'),
-            array('colourbg',ctx_tr('vis_messages','colourbg'),9,'ffffff'),
+            array('colourbg',ctx_tr('vis_messages','background colour'),9,'ffffff'),//renamed for clarity
             array('kw',ctx_tr('vis_messages','kW'),4,false),
             )
         ),
         
         // Hex colour EDC240 is the default color for flot. since we want existing setups to not change, we set the default value to it manually now,
-        'rawdata'=> array('label'=>ctx_tr('vis_messages','RawData'), 'options'=>array(
+        'rawdata'=> array('label'=>ctx_tr('vis_messages','Raw Data'), 'options'=>array(
             array('feedid',ctx_tr('vis_messages','feed'),1),
             array('fill',ctx_tr('vis_messages','fill'),7,0),
             array('colour',ctx_tr('vis_messages','colour'),9,'EDC240'),
@@ -39,7 +41,7 @@
             )
         ),
         
-        'bargraph'=> array('label'=>ctx_tr('vis_messages','BarGraph'), 'options'=>array(
+        'bargraph'=> array('label'=>ctx_tr('vis_messages','Bar Graph'), 'options'=>array(
             array('feedid',ctx_tr('vis_messages','feed'),0),
             array('colour',ctx_tr('vis_messages','colour'),9,'EDC240'),
             array('colourbg',ctx_tr('vis_messages','colourbg'),9,'ffffff'),
@@ -61,32 +63,33 @@
             array('delta',ctx_tr('vis_messages','delta'),4,0)
         )),
         
+        //rearranged and renamed stacked options for better clarity
         'stacked'=> array('label'=>ctx_tr('vis_messages','Stacked'), 'options'=>array(
-            array('bottom',ctx_tr('vis_messages','bottom'),0),
-            array('top',ctx_tr('vis_messages','top'),0),
-            array('colourt',ctx_tr('vis_messages','colourt'),9,'7CC9FF'),
-            array('colourb',ctx_tr('vis_messages','colourb'),9,'0096FF'),
-            array('delta',ctx_tr('vis_messages','delta'),4,0)
+            array('top',ctx_tr('vis_messages','Top Feed'),0),
+            array('colourt',ctx_tr('vis_messages','Top Colour'),9,'7CC9FF'),
+            array('bottom',ctx_tr('vis_messages','Bottom Feed'),0),
+            array('colourb',ctx_tr('vis_messages','Bottom Feed'),9,'0096FF'),
+            array('delta',ctx_tr('vis_messages','Delta'),4,0)
         )),
         
-        'stackedsolar'=> array('label'=>ctx_tr('vis_messages','StackedSolar'), 'options'=>array(
+        'stackedsolar'=> array('label'=>ctx_tr('vis_messages','Stacked Solar'), 'options'=>array(
             array('solar',ctx_tr('vis_messages','solar'),0),
             array('consumption',ctx_tr('vis_messages','consumption'),0),
             array('delta',ctx_tr('vis_messages','delta'),4,0)
         )),
         
-        'simplezoom'=> array('label'=>ctx_tr('vis_messages','SimpleZoom'), 'options'=>array(
+        'simplezoom'=> array('label'=>ctx_tr('vis_messages','Simple Zoom'), 'options'=>array(
             array('power',ctx_tr('vis_messages','power'),1),
             array('kwhd',ctx_tr('vis_messages','kwh'),0),
             array('delta',ctx_tr('vis_messages','delta'),4,0)
         )),
         
-        'orderbars'=> array('label'=>ctx_tr('vis_messages','OrderBars'), 'options'=>array(
+        'orderbars'=> array('label'=>ctx_tr('vis_messages','Order Bars'), 'options'=>array(
             array('feedid',ctx_tr('vis_messages','feed'),0),
             array('delta',ctx_tr('vis_messages','delta'),4,0)
         )),
         
-        'multigraph' => array ('label'=>ctx_tr('vis_messages','MultiGraph'), 'action'=>'multigraph', 'options'=>array(
+        'multigraph' => array ('label'=>ctx_tr('vis_messages','Multigraph'), 'action'=>'multigraph', 'options'=>array(
             array('mid',ctx_tr('vis_messages','mid'),8)
         )),
         
