@@ -298,7 +298,7 @@ function drawMultigraphFeedlistEditor(){
 
   out += "</table>";
   var name = "<div class='input-prepend'><span class='add-on' style='width: 70px; text-align: right;'>"+_Tr_Vis("Name")+"</span><input class='options' id='multigraph-name' value='"+multigraphsName[multigraphID]+"' type='text'></div>";
-  out += name+"<button id='delete-multigraph-button' class='btn btn-danger'><i class='icon-trash'></i>"+_Tr_Vis("Delete")+"</button>";
+  out += name+"<button id='delete-multigraph-button' class='btn btn-danger'><i class='icon-trash' style='margin-right:6px;'></i>"+_Tr_Vis("Delete")+"</button>";
   out += "<button id='save-multigraph-button' class='btn btn-success' style='width: 140px;float:right'>"+_Tr_Vis("Not modified")+"</button>";
   $("#feedtable").html(out);
 }
