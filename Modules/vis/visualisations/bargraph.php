@@ -9,17 +9,56 @@
     http://openenergymonitor.org
     */
 
+/**
+ * Bar Graph Visualization Template
+ * 
+ * This file renders a bar chart visualization for aggregated feed data.
+ * Displays data as vertical bars with customizable intervals (daily, monthly, yearly).
+ * 
+ * PHP Template Section:
+ * ====================
+ * This section handles:
+ * 1. Security check and global variable access
+ * 2. JavaScript library includes (Flot.js, Feed API, helpers)
+ * 3. HTML structure generation (bar chart container, controls, statistics)
+ * 4. Custom CSS for statistics display
+ * 
+ * Parameters Received from Controller:
+ * ====================================
+ * - $feedid: Feed ID (integer, validated, accepts realtime or daily feed)
+ * - $feedidname: Feed name (string, for display)
+ * - $apikey: API key for Feed API authentication
+ * - $embed: Embed mode (0=normal, 1=fullscreen)
+ * - Optional URL parameters: colour, colourbg, interval, units, dp, scale, average, delta
+ * 
+ * Key Features:
+ * ============
+ * - Bar chart rendering: Uses Flot.js bars plugin
+ * - Aggregation intervals: Daily (/D), Monthly (/M), Yearly (/Y)
+ * - Statistics overlay: Shows aggregated values at bottom of chart
+ * - Time window controls: Day, Week, Month, Year presets
+ */
     defined('EMONCMS_EXEC') or die('Restricted access');
     global $path, $embed, $vis_version;
     
 ?>
 
+<!-- Internet Explorer 8 compatibility -->
 <!--[if IE]><script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/flot/excanvas.min.js"></script><![endif]-->
+
+<!-- Flot.js plotting library (includes bars plugin) -->
 <script language="javascript" type="text/javascript" src="<?php echo $path; ?>Lib/flot/jquery.flot.merged.js"></script>
+
+<!-- Feed API wrapper: Provides feed.getdata() function -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Modules/feed/feed.js?v=<?php echo $vis_version; ?>"></script>
+
+<!-- Visualization helper functions: view manipulation, statistics calculation -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/vis.helper.js?v=<?php echo $vis_version; ?>"></script>
 
+<!-- Visualization title container -->
 <div id="vis-title"></div>
+
+<!-- Custom CSS for statistics display overlay -->
 <style>
     .stats-container{
         position: absolute;
@@ -30,20 +69,31 @@
         font-size: 1.3rem;
     }
 </style>
+
+<!-- Main bar chart container -->
 <div id="placeholder_bound" style="position: relative; height: 75vh">
+    <!-- Bar chart canvas: Flot.js will render bars here -->
     <div id="placeholder" style="position:absolute; top:0px;"></div>
+    
+    <!-- Navigation and control buttons -->
     <div id="graph-buttons" style="position:absolute; top:18px; right:32px; opacity:0.5;">
+        <!-- Time window presets: Day, Week, Month, Year -->
         <div class='btn-group'>
             <button class='btn graph-time' type='button' time='1'>D</button>
             <button class='btn graph-time' type='button' time='7'>W</button>
             <button class='btn graph-time' type='button' time='30'>M</button>
             <button class='btn graph-time' type='button' time='365'>Y</button>
         </div>
+        
+        <!-- Aggregation interval buttons: Daily, Monthly, Yearly -->
+        <!-- These control how data is aggregated (per day, per month, per year) -->
         <div class='btn-group'>
             <button class='btn graph-interval' type='button' interval='d'><span id="textunitD"></span>/D</button>
             <button class='btn graph-interval' type='button' interval='m'><span id="textunitM"></span>/M</button>
             <button class='btn graph-interval' type='button' interval='y'><span id="textunitY"></span>/Y</button>
         </div>
+        
+        <!-- Zoom and pan controls (hidden by default, shown on hover) -->
         <div class='btn-group' id='graph-navbar' style='display: none;'>
             <button class='btn graph-nav' id='zoomin'>+</button>
             <button class='btn graph-nav' id='zoomout'>-</button>
@@ -51,6 +101,8 @@
             <button class='btn graph-nav' id='right'>></button>
         </div>
     </div>
+    
+    <!-- Statistics overlay: Shows aggregated values (sum, average, etc.) -->
     <h3 class="stats-container"><span id="stats"></span></h3>
 </div>
 

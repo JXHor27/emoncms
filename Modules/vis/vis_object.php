@@ -1,6 +1,131 @@
 <?php
+/**
+ * Visualization Configuration Registry
+ * 
+ * This file defines all available visualization types and their configuration schemas.
+ * It serves as the central registry that the vis module uses to:
+ * - Generate the visualization selection UI in vis_main_view.php
+ * - Validate parameters in vis_controller.php
+ * - Provide metadata for widget rendering
+ * 
+ * How It Works:
+ * =============
+ * The $visualisations array maps visualization keys (route names) to their configuration.
+ * When a user accesses /vis/{key}, the controller looks up the key in this array to:
+ * 1. Validate required parameters
+ * 2. Extract and sanitize optional parameters
+ * 3. Load the corresponding visualization file from visualisations/{key}.php
+ * 
+ * Array Structure:
+ * ===============
+ * $visualisations = array(
+ *     'visualization_key' => array(
+ *         'label' => 'Display Name',           // Human-readable name (translated)
+ *         'action' => 'route_override',        // Optional: override route key
+ *         'options' => array(                   // Array of parameter definitions
+ *             array('param_name', 'label', type_code, default_value),
+ *             ...
+ *         )
+ *     ),
+ *     ...
+ * );
+ * 
+ * Option Array Format:
+ * ===================
+ * Each option is defined as: array('param_name', 'translated_label', type_code, default_value)
+ * 
+ * - param_name: URL parameter name (e.g., 'feedid', 'colour', 'units')
+ * - translated_label: Display label (uses ctx_tr() for internationalization)
+ * - type_code: Parameter type (see Parameter Types below)
+ * - default_value: Default value if parameter not provided (optional, can be omitted)
+ * 
+ * Parameter Types:
+ * ===============
+ * Type codes define how parameters are validated and processed by vis_controller.php:
+ * 
+ * 0 - Feed (realtime or daily): Accepts any feed type
+ *     Validation: Checks feed exists, belongs to user, or is public
+ *     Returns: Feed ID (integer)
+ * 
+ * 1 - Feed (realtime only): Requires realtime feed
+ *     Validation: Same as type 0, but also checks feed engine type
+ *     Returns: Feed ID (integer)
+ * 
+ * 2 - Feed (daily only): Requires daily feed
+ *     Validation: Same as type 0, but checks for daily feed type
+ *     Returns: Feed ID (integer)
+ * 
+ * 4 - Boolean: True/false value
+ *     Validation: Converts "true", "1" to 1, "false", "0" to 0
+ *     Returns: 0 or 1 (integer)
+ * 
+ * 5 - Text: String value
+ *     Validation: Sanitizes with regex (removes special chars except allowed Unicode)
+ *     Returns: Sanitized string
+ * 
+ * 6 - Float: Decimal number
+ *     Validation: Converts to float, replaces comma with dot
+ *     Returns: Float value
+ * 
+ * 7 - Integer: Whole number
+ *     Validation: Converts to integer
+ *     Returns: Integer value
+ * 
+ * 8 - Multigraph ID: References a multigraph
+ *     Validation: Checks multigraph exists and belongs to user
+ *     Returns: Multigraph ID (integer)
+ * 
+ * 9 - Colour: Color value (hex code or color name)
+ *     Validation: Removes invalid characters, ensures hex format
+ *     Returns: Color string (hex code without #)
+ * 
+ * Special Properties:
+ * ===================
+ * - 'action' property: Overrides the visualization key for routing
+ *   Example: 'multigraph' uses action='multigraph' to route to multigraph.php
+ *   instead of looking for visualisations/multigraph.php
+ * 
+ * Usage in Controller:
+ * ===================
+ * vis_controller.php processes these options in the following way:
+ * 1. Extracts each option from URL parameters using get($param_name)
+ * 2. Validates based on type_code
+ * 3. Stores validated values in $array[$param_name]
+ * 4. Passes $array to visualization template file
+ * 
+ * Adding New Visualizations:
+ * ==========================
+ * 1. Add entry to $visualisations array with unique key
+ * 2. Define 'label' (translated display name)
+ * 3. Define 'options' array with all parameters
+ * 4. Create visualization file: visualisations/{key}.php
+ * 5. Add translation strings to locale files if needed
+ * 
+ * Example:
+ * --------
+ * 'myvis' => array(
+ *     'label' => ctx_tr('vis_messages', 'My Visualization'),
+ *     'options' => array(
+ *         array('feedid', ctx_tr('vis_messages', 'feed'), 1),      // Required feed
+ *         array('colour', ctx_tr('vis_messages', 'colour'), 9, 'FF0000'),  // Optional color
+ *         array('showlegend', ctx_tr('vis_messages', 'show legend'), 4, true)  // Optional boolean
+ *     )
+ * )
+ * 
+ * Dependencies:
+ * ============
+ * - Used by: vis_controller.php (parameter validation)
+ * - Used by: vis_main_view.php (UI generation)
+ * - Used by: vis/widget/vis_render.js (widget rendering)
+ * - Requires: locale/vis_messages translation files for labels
+ * 
+ * TODO:
+ * =====
+ * - Consider moving this to PHP source format for vis/widget/vis_render.js
+ * - Currently duplicated in JavaScript for widget rendering
+ */
 
-    /* Types:
+    /* Parameter Type Codes:
       0 - feed realtime or daily
       1 - feed realtime
       2 - feed daily
@@ -12,8 +137,18 @@
       9 - colour
     */
 
-    //CHAVEIRO TODO: only used in vis_main_view.php, should be php source for vis/widget/vis_render.js vis_widgetlist variable data
+    // TODO: This array is currently used in vis_main_view.php for UI generation.
+    // Consider refactoring to provide PHP source for vis/widget/vis_render.js vis_widgetlist variable data
+    // to avoid duplication between PHP and JavaScript.
 
+    /**
+     * Visualization Registry Array
+     * 
+     * Maps visualization keys to their configuration schemas.
+     * Each entry defines the parameters, types, and defaults for a visualization type.
+     * 
+     * @var array Associative array: 'key' => array('label' => ..., 'options' => ...)
+     */
     /* fixed some typo, added space in between words*/
 
     $visualisations = array(

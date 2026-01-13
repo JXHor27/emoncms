@@ -159,24 +159,70 @@
     }
 
     /*
-    MULTIGRAPH ACTIONS
+    MULTIGRAPH JSON API ACTIONS
+    ===========================
+    
+    This section handles JSON API requests for multigraph management.
+    Multigraphs are collections of feeds that can be displayed together in visualizations.
+    
+    Route Format: /vis/multigraph/{subaction}.json
+    
+    Authentication:
+    - Read operations (get, getlist): Require session['read'] permission
+    - Write operations (new, set, delete): Require session['write'] permission
+    
+    Return Format:
+    All responses are wrapped in array('content' => $result) by the controller return statement.
+    The $result value depends on the subaction (see method documentation below).
+    
+    Endpoints:
+    - GET  /vis/multigraph/get.json?id=X       - Get multigraph by ID
+    - GET  /vis/multigraph/getlist.json        - List all multigraphs for current user
+    - POST /vis/multigraph/new.json            - Create new multigraph
+    - POST /vis/multigraph/set.json            - Update multigraph (requires: id, feedlist, name)
+    - POST /vis/multigraph/delete.json?id=X    - Delete multigraph
+    
+    Parameter Extraction:
+    - get('id') - Extracts 'id' parameter from GET/POST request
+    - get('feedlist') - Extracts 'feedlist' parameter (JSON string)
+    - get('name') - Extracts 'name' parameter (multigraph name)
+    - $session['userid'] - Current user ID from session
+    
+    Error Handling:
+    - Invalid multigraph IDs: Methods return error arrays
+    - Missing permissions: Write operations check $session['write'] before execution
+    - Missing parameters: get() function returns null/false for missing params
     */
 
     elseif ($route->format == 'json' && $route->action == 'multigraph')
     {
+        // Read operations: Get single multigraph or list all multigraphs
         if ($route->subaction == 'get') {
+            // GET /vis/multigraph/get.json?id=X
+            // Returns: Array with 'name' and 'feedlist', or error array if not found
             $result = $multigraph->get(get('id'),$session['userid']);
         } elseif ($route->subaction == 'getlist') {
+            // GET /vis/multigraph/getlist.json
+            // Returns: Array of multigraph objects for current user
             $result = $multigraph->getlist($session['userid']);
-        } elseif ($session['write']) {
+        } 
+        // Write operations: Require write permission
+        elseif ($session['write']) {
             if ($route->subaction == 'new') {
+                // POST /vis/multigraph/new.json
+                // Returns: Integer (new multigraph ID) or false on error
                 $result = $multigraph->create($session['userid']);
             } elseif ($route->subaction == 'delete') {
+                // POST /vis/multigraph/delete.json?id=X
+                // Returns: Array with 'success' and 'message' keys
                 $result = $multigraph->delete(get('id'),$session['userid']);
             } elseif ($route->subaction == 'set') {
+                // POST /vis/multigraph/set.json (requires: id, feedlist, name)
+                // Returns: Array with 'success' and 'message' keys
                 $result = $multigraph->set(get('id'),$session['userid'],get('feedlist'),get('name'));
             }
         }
+        // Note: If write permission is missing, $result remains false (from initialization)
 
     }
 

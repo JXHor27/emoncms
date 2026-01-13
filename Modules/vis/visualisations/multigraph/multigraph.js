@@ -1,3 +1,31 @@
+/**
+ * Multigraph Visualization JavaScript
+ * 
+ * This file handles the rendering and data fetching for multigraph visualizations.
+ * A multigraph displays multiple feeds together in a single interactive graph.
+ * 
+ * Data Flow:
+ * 1. User interaction triggers visFeedData()
+ * 2. visFeedData() handles autorefresh logic and calls visFeedDataOri()
+ * 3. visFeedDataOri() debounces requests (500ms delay) and calls visFeedDataDelayed()
+ * 4. visFeedDataDelayed() initiates async AJAX calls via feed.getdata() for each feed
+ * 5. feed.getdata() makes HTTP request to Feed API
+ * 6. On success, visFeedDataCallback() is called with the data
+ * 7. visFeedDataCallback() updates plotdata array and triggers plot() to render graph
+ * 
+ * Error Handling:
+ * - Failed AJAX requests: feed.getdata() callback receives null/undefined data
+ * - Aborted requests: ajaxAsyncXdr array tracks XHR objects for abort() calls
+ * - Missing data: Check for data validity in callback before plotting
+ * 
+ * Dependencies:
+ * - feed.getdata() from Modules/feed/feed.js - handles AJAX requests to Feed API
+ * - view object from Lib/vis.helper.js - manages time window and view state
+ * - tooltip() from Lib/vis.helper.js - displays hover tooltips
+ * - parse_timepicker_time() from Lib/vis.helper.js - parses date strings
+ * - $.plot() from Flot.js - renders the graph
+ */
+
 //get_feed_data_async is defined in /Modules/vis/visualisations/common/api.js
 /*global get_feed_data_async */
 //view, tooltip and parse_timepicker_time are defined in Lib/vis.helper.js
@@ -10,19 +38,56 @@
 /*eslint no-undef: "error"*/
 /*eslint no-console: ["error", { allow: ["warn", "error"] }] */
 
-var plotdata = [];
-var timeWindowChanged = 0;
-var ajaxAsyncXdr = [];
-var eventVisFeedData;
-var eventRefresh;
-var showlegend = true;
-var backgroundColour = "ffffff";
-var datetimepicker1;
-var datetimepicker2;
-var graphtype;
-var intervaltype;
+/**
+ * Global Variables
+ */
+var plotdata = [];              // Array of plot series data for Flot.js rendering
+var timeWindowChanged = 0;      // Flag tracking if time window has changed (currently unused)
+var ajaxAsyncXdr = [];          // Array of XMLHttpRequest objects, used to abort pending AJAX requests
+                                // Index corresponds to feed index in multigraphFeedlist
+var eventVisFeedData;           // Timeout ID for debouncing feed data requests
+var eventRefresh;               // Timeout ID for autorefresh interval
+var showlegend = true;          // Whether to display the graph legend
+var backgroundColour = "ffffff"; // Background color for the visualization (hex, no #)
+var datetimepicker1;            // jQuery datetimepicker instance for start time
+var datetimepicker2;            // jQuery datetimepicker instance for end time
+var graphtype;                  // Current graph type ("lines", "bars", "lineswithsteps")
+var intervaltype;               // Data interval type for feed queries
 
+/**
+ * Converts multigraph feed list configuration into Flot.js plot series format.
+ * 
+ * This function processes the multigraphFeedlist array and creates plot series
+ * configurations for each feed, including styling, colors, graph types, and axis assignments.
+ * 
+ * @param {Array} multigraphFeedlist - Array of feed configuration objects
+ *   Each object contains:
+ *   - id: Feed ID number
+ *   - name: Feed name string
+ *   - tag: Optional tag prefix for label
+ *   - graphtype: "lines", "bars", or "lineswithsteps"
+ *   - lineColour: Color hex code (with or without #)
+ *   - fill: Boolean for area fill
+ *   - stacked: Boolean for stacked display
+ *   - left/right: Boolean for y-axis assignment (left=1, right=2)
+ *   - showtag: Boolean to show tag in label
+ *   - showlegend: Boolean to show legend
+ *   - ymin/ymax/y2min/y2max: Optional axis limits
+ *   - backgroundColour: Background color hex
+ *   - barwidth: Bar width multiplier (for bar graphs)
+ *   - skipmissing: Skip missing data points
+ *   - delta: Calculate delta values
+ *   - average: Average data points
+ *   - intervaltype: Data interval type
+ * 
+ * @returns {Array|undefined} Array of plot series objects for Flot.js, or undefined if invalid input
+ *   Each plot series object contains:
+ *   - id: Feed ID
+ *   - selected: Boolean (1=visible, 0=hidden)
+ *   - plot: Flot.js series configuration object
+ */
 function convertToPlotlist(multigraphFeedlist) {
+  // Validate input: check if multigraphFeedlist exists and has at least one item
   if (multigraphFeedlist==undefined) return;
   if (!multigraphFeedlist[0]) return;
   var plotlist = [];
@@ -123,114 +188,303 @@ function convertToPlotlist(multigraphFeedlist) {
 
 
 
-/*
- Handle Feeds
-*/
+/**
+ * Main entry point for fetching feed data.
+ * 
+ * Handles autorefresh logic: if autorefresh is enabled and the current time window
+ * is close to "now" (within 2x autorefresh interval), it automatically updates
+ * the end time to current time and schedules the next refresh.
+ * 
+ * Call Chain: visFeedData() → visFeedDataOri() → visFeedDataDelayed() → feed.getdata() → visFeedDataCallback()
+ * 
+ * @param {number} autorefresh - Optional autorefresh interval in seconds (from multigraphFeedlist[0].autorefresh)
+ *   If set, automatically refreshes data when viewing recent time windows
+ */
 function visFeedData() {
+    // Check if autorefresh is configured for this multigraph
     if (typeof multigraphFeedlist !== "undefined" && typeof multigraphFeedlist[0] !== "undefined" && typeof multigraphFeedlist[0]["autorefresh"] !== "undefined") {
         var now = new Date().getTime();
         var timeWindow = view.end - view.start;
+        
+        // If viewing recent data (within 2x autorefresh interval of now), enable auto-update
+        // This keeps the graph current when viewing live/recent data
         if (now - view.end < 2000 * multigraphFeedlist[0]["autorefresh"]) {
-        view.end = now;
-        view.start = view.end - timeWindow;
+            // Update time window to current time while maintaining window size
+            view.end = now;
+            view.start = view.end - timeWindow;
             visFeedDataOri();
-            clearTimeout(eventRefresh); // Cancel any pending event
+            
+            // Schedule next autorefresh: clear any pending refresh and set new one
+            clearTimeout(eventRefresh);
             eventRefresh = setTimeout(visFeedData, 1000 * multigraphFeedlist[0]["autorefresh"]);
         } else {
+            // Not viewing recent data, just fetch once
             visFeedDataOri();
         }
     } else {
+        // No autorefresh configured, just fetch data once
         visFeedDataOri();
     }
 }
 
 
-// Ignore load request spurts
+/**
+ * Debounces feed data requests to prevent excessive AJAX calls.
+ * 
+ * This function implements a 500ms debounce delay to avoid making multiple
+ * requests when the user rapidly changes the time window (e.g., zooming, panning).
+ * 
+ * Also updates the datetime picker UI to reflect current view time window.
+ * 
+ * @see visFeedDataDelayed() - Called after debounce delay
+ */
 function visFeedDataOri() {
+  // Update datetime picker UI to match current view time window
   datetimepicker1.setLocalDate(new Date(view.start));
   datetimepicker2.setLocalDate(new Date(view.end));
   datetimepicker1.setEndDate(new Date(view.end));
   datetimepicker2.setStartDate(new Date(view.start));
 
-  clearTimeout(eventVisFeedData); // Cancel any pending events
+  // Debounce: Cancel any pending delayed request and schedule a new one
+  // This prevents multiple AJAX calls when user rapidly changes view
+  clearTimeout(eventVisFeedData);
   eventVisFeedData = setTimeout(function() { visFeedDataDelayed(); }, 500);
-  if (typeof multigraphFeedlist !== "undefined" && multigraphFeedlist.length !== plotdata.length) {plotdata = [];}
+  
+  // If feed list length changed, reset plotdata array to match
+  if (typeof multigraphFeedlist !== "undefined" && multigraphFeedlist.length !== plotdata.length) {
+    plotdata = [];
+  }
+  
+  // Immediately render with existing data (may be stale, but provides instant feedback)
   plot();
 }
 
 
 
-// Load relevant feed data asynchronously
+/**
+ * Initiates asynchronous AJAX requests to fetch feed data for all selected feeds.
+ * 
+ * This function is called after the debounce delay. It:
+ * 1. Converts feed list to plot series format
+ * 2. Calculates optimal data interval based on time window
+ * 3. For each selected feed without data, initiates an async AJAX request
+ * 4. Aborts any pending requests for the same feed to prevent race conditions
+ * 
+ * AJAX Pattern:
+ * - Uses feed.getdata() which makes HTTP GET request to Feed API
+ * - Returns XMLHttpRequest object stored in ajaxAsyncXdr[] for potential abort()
+ * - On success, calls visFeedDataCallback() with data
+ * - On error, callback receives null/undefined data (check in callback)
+ * 
+ * Error Handling:
+ * - Aborts pending requests before starting new ones (prevents race conditions)
+ * - Callback should validate data before using it
+ * - Network errors are handled by feed.getdata() internally
+ * 
+ * @see visFeedDataCallback() - Called when AJAX request completes
+ * @see feed.getdata() - Defined in Modules/feed/feed.js, handles HTTP requests
+ */
 function visFeedDataDelayed() {
+  // Convert feed configuration to Flot.js plot series format
   var plotlist = convertToPlotlist(multigraphFeedlist);
+  
+  // Calculate optimal data interval: aim for ~2400 data points
+  // This balances detail vs. performance
   var npoints = 2400;
-  var interval = Math.round(((view.end - view.start)/npoints)/1000);
+  var interval = Math.round(((view.end - view.start)/npoints)/1000); // Convert to seconds
 
+  // Iterate through each feed in the plot list
   for(var i in plotlist) {
+    // Only fetch data for selected (visible) feeds
     if (plotlist[parseInt(i,10)].selected) {
+      // Only fetch if we don't already have data for this feed
       if (!plotlist[parseInt(i,10)].plot.data) {
-        var skipmissing = 0; if (multigraphFeedlist[parseInt(i,10)]["skipmissing"]) skipmissing = 1;
-        var delta = 0;  
+        // Configure data processing options from feed settings
+        var skipmissing = 0;
+        if (multigraphFeedlist[parseInt(i,10)]["skipmissing"]) skipmissing = 1;
+        
+        var delta = 0;
+        // Delta mode calculates difference between consecutive points
+        // When delta is enabled, skipmissing is automatically disabled
         if (multigraphFeedlist[parseInt(i,10)]["delta"]!=undefined && multigraphFeedlist[parseInt(i,10)]["delta"]) {
             delta = 1;
             skipmissing = 0;
         }
-        var average = 0;  
+        
+        var average = 0;
+        // Average mode calculates mean values over the interval
         if (multigraphFeedlist[parseInt(i,10)]["average"]!=undefined && multigraphFeedlist[parseInt(i,10)]["average"]) {
             average = 1;
         }
         
+        // Override calculated interval if feed has specific intervaltype setting
         if (multigraphFeedlist[parseInt(i,10)]["intervaltype"]!=undefined && multigraphFeedlist[parseInt(i,10)]["intervaltype"]!="standard") {
             interval = multigraphFeedlist[parseInt(i,10)]["intervaltype"];
         }
         
-        if (typeof plotdata[parseInt(i,10)] === "undefined") {plotdata[parseInt(i,10)] = [];}
+        // Initialize plotdata array slot if needed
+        if (typeof plotdata[parseInt(i,10)] === "undefined") {
+          plotdata[parseInt(i,10)] = [];
+        }
 
+        // Abort any pending AJAX request for this feed to prevent race conditions
+        // This happens when user changes time window before previous request completes
         if (typeof ajaxAsyncXdr[parseInt(i,10)] !== "undefined") {
           ajaxAsyncXdr[parseInt(i,10)].abort(); // Abort pending loads
           ajaxAsyncXdr[parseInt(i,10)]="undefined";
         }
         
+        // Create context object to pass to callback
+        // This allows callback to know which feed the data belongs to
         var context = {index:i, plotlist:plotlist[parseInt(i,10)]};
-        ajaxAsyncXdr[parseInt(i,10)] = feed.getdata(plotlist[parseInt(i,10)].id,view.start,view.end,interval,average,delta,skipmissing,1,visFeedDataCallback,context);
+        
+        /**
+         * Initiate asynchronous AJAX request to fetch feed data
+         * 
+         * feed.getdata() Parameters:
+         * @param {number} feedid - Feed ID to fetch
+         * @param {number} start - Start timestamp (milliseconds since epoch)
+         * @param {number} end - End timestamp (milliseconds since epoch)
+         * @param {number|string} interval - Data interval in seconds, or "daily" for daily data
+         * @param {number} average - Average mode: 0=off, 1=on (calculate mean over interval)
+         * @param {number} delta - Delta mode: 0=off, 1=on (calculate difference between points)
+         * @param {number} skipmissing - Skip missing data: 0=include nulls, 1=skip nulls
+         * @param {number} limitinterval - Limit interval mode: 0=off, 1=on
+         * @param {function} callback - Callback function(context, data) called on completion
+         * @param {object} context - Context object passed to callback
+         * 
+         * Returns: XMLHttpRequest object (stored in ajaxAsyncXdr[] for abort capability)
+         * 
+         * Callback receives:
+         * - context: The context object passed here
+         * - data: Array of [timestamp, value] pairs, or null/undefined on error
+         */
+        ajaxAsyncXdr[parseInt(i,10)] = feed.getdata(
+          plotlist[parseInt(i,10)].id,  // Feed ID
+          view.start,                    // Start time (ms)
+          view.end,                      // End time (ms)
+          interval,                      // Data interval (seconds or "daily")
+          average,                       // Average mode
+          delta,                         // Delta mode
+          skipmissing,                   // Skip missing data
+          1,                            // Limit interval mode
+          visFeedDataCallback,          // Success callback
+          context                        // Context for callback
+        );
       }
     }
   }
 }
 
-//load feed data to multigraph plot
+/**
+ * Callback function called when AJAX feed data request completes.
+ * 
+ * This function is invoked by feed.getdata() when the HTTP request finishes.
+ * It updates the plotdata array with the received data and triggers a graph re-render.
+ * 
+ * Error Handling:
+ * - If data is null/undefined (request failed), the feed won't be plotted
+ * - Check data validity before assigning to prevent errors
+ * - Failed feeds simply won't appear in the graph (graceful degradation)
+ * 
+ * @param {object} context - Context object passed from visFeedDataDelayed()
+ *   - context.index: Feed index in plotlist
+ *   - context.plotlist: Plot series configuration object
+ * @param {Array|null|undefined} data - Feed data array or null/undefined on error
+ *   Format: [[timestamp1, value1], [timestamp2, value2], ...]
+ *   Timestamps are in milliseconds since epoch
+ *   Values are numbers or null for missing data points
+ */
 function visFeedDataCallback(context,data) {
   var i = context["index"];
 
+  // Store data in plot series configuration
   context["plotlist"].plot.data = data;
+  
+  // Only update plotdata if we received valid data
+  // This prevents errors when AJAX request fails (data will be null/undefined)
   if (context["plotlist"].plot.data) {
     plotdata[parseInt(i,10)] = context["plotlist"].plot;
   }
+  // Note: If data is invalid, the feed simply won't be plotted
+  // This is graceful degradation - other feeds will still display
 
+  // Re-render graph with updated data
+  // This is called for each feed as its data arrives (may cause multiple renders)
+  // Flot.js handles this efficiently
   plot();
 }
 
+/**
+ * Renders the graph using Flot.js plotting library.
+ * 
+ * This function is called whenever plotdata changes or view settings update.
+ * It configures Flot.js with the current plotdata array and view settings.
+ * 
+ * @see plotdata - Global array of plot series, updated by visFeedDataCallback()
+ * @see view - Global view object from vis.helper.js, contains time window and axis limits
+ */
 function plot() {
   $.plot($("#graph"), plotdata, {
-    canvas: true,
-    grid: { show: true, hoverable: true, clickable: true },
-    xaxis: { mode: "time", timezone: "browser", min: view.start, max: view.end },
-    selection: { mode: "x" },
-    legend: { show: showlegend, position: "nw", toggle: true },
-    toggle: { scale: "visible" },
-    touch: { pan: "x", scale: "x", simulClick: false },
-    yaxis: { min: view.ymin , max: view.ymax},
-    y2axis: { min: view.y2min , max: view.y2max}
+    canvas: true,                    // Use HTML5 canvas for rendering (better performance)
+    grid: { 
+      show: true,                    // Show grid lines
+      hoverable: true,               // Enable hover tooltips
+      clickable: true                // Enable click selection
+    },
+    xaxis: { 
+      mode: "time",                  // X-axis displays time
+      timezone: "browser",           // Use browser's timezone
+      min: view.start,               // Minimum time (ms)
+      max: view.end                  // Maximum time (ms)
+    },
+    selection: { mode: "x" },        // Allow selecting time range by dragging
+    legend: { 
+      show: showlegend,              // Show/hide legend based on global flag
+      position: "nw",                // Position: northwest
+      toggle: true                   // Allow clicking legend items to show/hide series
+    },
+    toggle: { scale: "visible" },     // Toggle series visibility
+    touch: { 
+      pan: "x",                      // Allow panning on touch devices (x-axis only)
+      scale: "x",                    // Allow pinch-to-zoom (x-axis only)
+      simulClick: false              // Disable simultaneous click detection
+    },
+    yaxis: { 
+      min: view.ymin,                // Left Y-axis minimum (null = auto)
+      max: view.ymax                // Left Y-axis maximum (null = auto)
+    },
+    y2axis: { 
+      min: view.y2min,               // Right Y-axis minimum (null = auto)
+      max: view.y2max                // Right Y-axis maximum (null = auto)
+    }
   });
 }
 
 
+/**
+ * Initializes the multigraph visualization.
+ * 
+ * This is the main initialization function called when the visualization loads.
+ * It sets up the HTML structure, event handlers, and initial data fetch.
+ * 
+ * Initialization Steps:
+ * 1. Set default time window (7 days, or from multigraphFeedlist config)
+ * 2. Create HTML structure for graph and controls
+ * 3. Set up event handlers (zoom, pan, time selection, etc.)
+ * 4. Initialize datetime pickers
+ * 5. Set up tooltip hover handlers
+ * 6. Trigger initial data fetch
+ * 
+ * @param {jQuery|string} element - jQuery selector or element where graph will be rendered
+ */
 function multigraphInit(element) {
-  // Get start and end time of multigraph view
-  // end time and timewindow is stored in the first multigraphFeedlist item.
-  // start time is calculated from end - timewindow
+  // Initialize plotdata array
   plotdata = [];
-  var timeWindow = (3600000*24.0*7);
+  
+  // Set default time window: 7 days ending at current time
+  // This can be overridden by multigraphFeedlist[0] configuration
+  var timeWindow = (3600000*24.0*7); // 7 days in milliseconds
   var now = new Date().getTime();
   view.start = now - timeWindow;
   view.end = now;

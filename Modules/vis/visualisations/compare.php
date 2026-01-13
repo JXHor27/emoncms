@@ -6,22 +6,65 @@
     Emoncms - open source energy visualisation
     Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 */
+
+/**
+ * Compare Visualization Template (Feed Calibration Tool)
+ * 
+ * This file renders a feed comparison and calibration tool. Displays three visualizations:
+ * 1. Overlay comparison of FeedA and FeedB
+ * 2. Difference graph (FeedB - FeedA)
+ * 3. Scatter plot (FeedA vs FeedB) for linearity analysis
+ * 
+ * PHP Template Section:
+ * ====================
+ * This section handles:
+ * 1. Security check and global variable access
+ * 2. JavaScript library includes (Flot.js, Feed API, helpers)
+ * 3. HTML structure generation (three graph containers, input controls)
+ * 4. Conditional UI display (controls hidden when embedded)
+ * 5. Parameter extraction from URL (feedA, feedB)
+ * 
+ * Parameters Received from Controller:
+ * ====================================
+ * - $feedA: Feed A ID (integer, validated, must be realtime feed)
+ * - $feedB: Feed B ID (integer, validated, must be realtime feed)
+ * - $apikey: API key for Feed API authentication
+ * - $embed: Embed mode (0=normal, 1=fullscreen)
+ * 
+ * Key Features:
+ * ============
+ * - Feed comparison: Side-by-side visualization of two feeds
+ * - Calibration tool: Adjust FeedB calibration factor to match FeedA
+ * - Difference analysis: Shows difference between feeds
+ * - Linearity check: Scatter plot to verify linear relationship
+ * - Interactive controls: Load feeds, adjust calibration, update graphs
+ */
     defined('EMONCMS_EXEC') or die('Restricted access');
     global $path, $embed, $vis_version;
 
+    // Extract feed IDs from URL parameters (fallback to 0 if not provided)
     if (isset($_GET['feedA'])) $feedA = (int) $_GET['feedA']; else $feedA = 0;
     if (isset($_GET['feedB'])) $feedB = (int) $_GET['feedB']; else $feedB = 0;
 ?>
 
+<!-- Internet Explorer 8 compatibility -->
 <!--[if IE]><script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/flot/excanvas.min.js"></script><![endif]-->
+
+<!-- Flot.js plotting library -->
 <script language="javascript" type="text/javascript" src="<?php echo $path; ?>Lib/flot/jquery.flot.merged.js"></script>
+
+<!-- Feed API wrapper: Provides feed.getdata() function -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Modules/feed/feed.js?v=<?php echo $vis_version; ?>"></script>
+
+<!-- Visualization helper functions: view manipulation -->
 <script language="javascript" type="text/javascript" src="<?php echo $path;?>Lib/vis.helper.js?v=<?php echo $vis_version; ?>"></script>
 
+<!-- Conditional UI: Only show controls if not embedded -->
 <?php if (!$embed) { ?>
 <h2><?php echo tr("Feed calibration and comparison tool"); ?></h2>
 <p><?php echo tr("Use this tool to compare two feeds: FeedA and FeedB. Enter feed ids for comparison below. If there is a difference between feed values adjust the calibration to see if the difference can be removed."); ?></p>
 
+<!-- Feed selection controls -->
 <div class="input-prepend">
     <span class="add-on"><?php echo tr("Feed A ID"); ?></span>
     <input id="feedA" type="text"  style="width:100px">
@@ -33,6 +76,7 @@
     <button id="load" class="btn btn-info"><?php echo tr("Load"); ?></button>
 </div><br>
 
+<!-- Calibration adjustment controls -->
 <div class="input-prepend input-append">
     <span class="add-on"><?php echo tr("Feed B Calibration"); ?></span>
     <input id="calibration" type="text"  style="width:100px" value="1.0">
@@ -41,9 +85,11 @@
 
 <?php } ?>
 
+<!-- Main comparison graph: Overlay of FeedA and FeedB -->
 <div id="graph_bound" style="height:400px; width:100%; position:relative; ">
     <div id="graph"></div>
     <div id="graph-buttons" style="position:absolute; top:18px; right:32px; opacity:0.5;">
+        <!-- Time window presets: Day, Week, Month, Year -->
         <div class='btn-group'>
             <button class='btn graph-time' type='button' time='1'>D</button>
             <button class='btn graph-time' type='button' time='7'>W</button>
@@ -51,6 +97,7 @@
             <button class='btn graph-time' type='button' time='365'>Y</button>
         </div>
 
+        <!-- Zoom and pan controls -->
         <div class='btn-group' id='graph-navbar' style='display: none;'>
             <button class='btn graph-nav' id='zoomin'>+</button>
             <button class='btn graph-nav' id='zoomout'>-</button>
@@ -62,9 +109,11 @@
     <h3 style="position:absolute; top:0px; left:32px;"><span id="stats"></span></h3>
 </div>
 
+<!-- Difference graph: Shows FeedB - FeedA (with calibration applied) -->
 <h3><?php echo tr("Difference between feeds (FeedB calibration applied - FeedA)"); ?></h3>
 <div id="diff" style="width:100%; height:400px; "></div>
 
+<!-- Scatter plot: FeedA vs FeedB for linearity analysis -->
 <h3><?php echo tr("FeedA vs FeedB"); ?></h3>
 <p><?php echo tr("Relationship should be linear if measurements are the same"); ?></p>
 <div id="line" style="width:100%; height:400px; "></div>
