@@ -306,6 +306,13 @@ class Multigraph
         // Returns array if JSON is array, object (stdClass) if JSON is object
         $row['feedlist'] = json_decode($result['feedlist']);
         
+        // JSON validation: Check if feedlist is non-empty string that failed to decode
+        // Only flag as error if string is not empty and decoding returned null
+        // Empty feedlist strings are valid (represents no feeds), so no error
+        if (!empty($result['feedlist']) && $row['feedlist'] === null) {
+            $row['feedlist_error'] = true;  // Indicates JSON decode failure
+        }
+        
         return $row;
     }
 
@@ -362,11 +369,23 @@ class Multigraph
         {
             // Decode feedlist JSON string to PHP array/object
             // Returns null if JSON is empty or malformed
-            $multigraphs[] = array(
+            $decoded_feedlist = json_decode($row->feedlist);
+            
+            // Build multigraph entry
+            $multigraph_entry = array(
                 'id'=>$row->id,
                 'name'=>$row->name,
-                'feedlist'=>json_decode($row->feedlist)
+                'feedlist'=>$decoded_feedlist
             );
+            
+            // JSON validation: Check if feedlist is non-empty string that failed to decode
+            // Only flag as error if string is not empty and decoding returned null
+            // Empty feedlist strings are valid (represents no feeds), so no error
+            if (!empty($row->feedlist) && $decoded_feedlist === null) {
+                $multigraph_entry['feedlist_error'] = true;  // Indicates JSON decode failure
+            }
+            
+            $multigraphs[] = $multigraph_entry;
         }
         
         // Returns empty array if user has no multigraphs
