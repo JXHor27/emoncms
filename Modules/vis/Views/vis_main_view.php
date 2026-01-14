@@ -41,7 +41,6 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 <!--increase width of container to fit the text and dropdown on the same line-->
     <div style="width:350px; background-color:#efefef; border: 1px solid #ddd; border-radius: 8px;">
         <div style="padding:5px;  border-top: 1px solid #fff">
-          
             <div style="float:left; padding-top:2px; font-weight:bold; margin-left: 5px;"><?php echo ctx_tr('vis_messages','Select visualisation:')?> </div>
             <div style="float:right;"><span id="select"></span></div>
             <div style="clear:both"></div>
@@ -49,100 +48,26 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
         <div style="padding:5px;  border-top: 1px solid #fff">
             <div style="padding-top:2px; font-weight:bold; margin-left: 5px;"><?php echo ctx_tr('vis_messages','Set options:')?> </div><br>
             <div id="box-options" ></div><br>
-            <!-- Added note to check feed type if feed not appearing in selection box -->
-            <div style="
-              border:1px solid #f7bda6;
-              background:#fff4e5;
-              padding:10px 12px;
-              border-radius:6px;
-              font-size:12px;
-              color:#666;
-              margin:10px;
-            ">
-              <span style="font-weight:bold; margin-right:8px;">ℹ</span>
-              <?php echo ctx_tr('vis_messages','If a feed does not appear in the selection box, check that the type has been set on the feeds page.'); ?>
-            </div>
-
-
+            <p style="font-size:12px; color:#444;"><b><?php echo ctx_tr('vis_messages','Note:');?></b> <?php echo ctx_tr('vis_messages','If a feed does not appear in the selection box, check that the type has been set on the feeds page.'); ?></p>
         </div>
         <div style="padding:5px;  border-top: 1px solid #fff">
-            <div style="float:left; padding-top:2px; font-weight:bold; margin-left: 8px;"></div>
-            <div style="floating:right;">
-                <button id="viewbtn" type="button" class="btn btn-info" style="width:140px; justify-content: center; padding:8px 20px; border-radius:6px; font-weight:bold;">
-                  <i style="margin-right:6px;"></i>
-                  <span style="margin-right:6px;">👁</span> <?php echo ctx_tr('vis_messages','View'); ?>
-                </button>
-
-                <button id="fullscreen" type="button" class="btn btn-success" style="width:140px;padding:8px 20px; border-radius:6px; font-weight:bold; float: right; margin-right: 8px;">
-                  <span style="margin-right:6px;">⤢</span>
-                  <?php echo ctx_tr('vis_messages','Full screen'); ?>
-                </button>
-
-                <button id="minimizebtn" type="button" class="btn btn-warning" style="display:none; width:140px;padding:8px 20px; border-radius:6px; font-weight:bold; float: right; margin-right: 8px;">
-                  <i class="icon-resize-small" style="margin-right:6px; color: #ddd; "></i>
-                  Minimize
-                </button>
-
+            <div style="float:left; padding-top:2px; font-weight:bold; margin-left: 5px;"></div>
+            <div style="float:right;">
+                <input id="viewbtn" type="button" value="<?php echo ctx_tr('vis_messages','View'); ?>" class="btn btn-info" style="padding 20px; border-radius:6px; font-weight:bold;"/>
+                <input id="fullscreen" type="button" value="<?php echo ctx_tr('vis_messages','Full screen'); ?>" class="btn btn-info" style="padding 20px; border-radius:6px; font-weight:bold;"/>
+                <!--Added a minimize button to exit from full screen-->
+                <input id="minimizebtn" type="button" value="Minimize" class="btn btn-warning" style="display:none;" />
             </div>
             <div style="clear:both"></div>
         </div>
         <div style="padding:5px;  border-top: 1px solid #fff">
             <div style="padding-top:2px; font-weight:bold; margin-left: 5px;"><?php echo ctx_tr('vis_messages','Embed in your website:'); ?> </div><br>
-
-            <!--Modified the textarea: added box, copy button, scroll horizontally-->
-            <!-- Embed info / warning box (hidden by default) -->
-            <div id="embedNote" style="
-              display:none;
-              border:1px solid #e0c7b3;
-              background:#fbf6f1;
-              padding:10px 12px;
-              border-radius:6px;
-              font-size:12px;
-              color:#444;
-              margin-top:10px;
-            ">
-              <span style="font-weight:bold; margin-right:8px;">🔒</span>
-              <span id="embedNoteText"></span>
-            </div>
-
-            <div style="margin-top:10px; font-weight: lighter; margin-left:5px; font-size: 14px;">
-              <?php echo ctx_tr('vis_messages','To embed privately:'); ?>
-            </div>
-
-            <!-- Embed code container -->
-            <div style="
-              position: relative;
-              border:1px solid #ddd;
-              background:#fff;
-              padding:10px 10px 12px 10px;
-              border-radius:6px;
-              margin-top:8px;
-            ">
-
-              <!-- Copy button -->
-              <button id="copyEmbedBtn" type="button" class="btn btn-small" style="
-                position:absolute;
-                top:8px;
-                right:8px;
-                border-radius:6px;
-                margin-top:5px;
-                margin-right:5px;
-              "><span style="margin-right: 0px;">📋</span>
-              Copy</button>
-
-              <!-- Code box (horizontal scroll) -->
-              <pre id="embedcode" style="
-                margin:0;
-                padding:34px 8px 8px 8px;  /* space for Copy button */
-                font-size:12px;
-                line-height:1.4;
-                white-space: pre;          /* keep formatting */
-                overflow-x: auto;          /* horizontal scroll */
-                overflow-y: hidden;        /* no vertical scroll */
-                max-width: 340px;
-              "></pre>
-            </div>
-
+            
+            <!--Modified the textarea to be adjustable vertically only to improve neatness of UI-->
+            <textarea id="embedcode" 
+                style="width:315px; height:120px; max-width:340px; resize: vertical;" 
+                readonly="readonly">
+            </textarea>
 
         </div>
     </div>
@@ -156,59 +81,23 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 
 <!-- Added fullscreen mode styling -->
 <style>
-/* Fullscreen state */
 #vispage.fullscreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 9999;
-  background: #fff;
-  padding: 10px;
-  overflow: hidden;
-}
-
-/* FLIP animation support */
-#vispage {
-  transform-origin: top left;
-  will-change: transform;
-}
-
-#vispage.animating {
-  transition: transform 0.4s ease-in-out;
-}
-
-/* Optional: fade iframe during redraw */
-#visiframe {
-  opacity: 1;
-  transition: opacity 0.2s ease;
-}
-#visiframe.fading {
-  opacity: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    background: #fff;
+    padding: 10px;
+    overflow: hidden;
 }
 
 #vispage.fullscreen #vis_bound {
-  width: 100% !important;
-  height: calc(100% - 40px) !important;
-}
-
-
-/* Fade effect for iframe redraw */
-/* #visiframe {
-  opacity: 1;
-  transition: opacity 200ms ease; */
-
-#visiframe.fading {
-  opacity: 0;
-}
-
-#vispage.fullscreen #vis_bound {
-  width: 100% !important;
-  height: calc(100% - 40px) !important;
+    width: 100% !important;
+    height: calc(100% - 40px) !important;
 }
 </style>
-
 
 
 <script type="application/javascript">
@@ -276,122 +165,60 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
     var height = $("#visiframe").height();
 
     $("#visiframe").html('<iframe style="width:'+width+'px; height:'+height+'px;" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="'+visurl+'&embed=1"></iframe>');
-    if (publicfeed == 1) {
-      $("#embedNote").hide();
-      $("#embedNoteText").text("");
-      $("#embedcode").text('<iframe style="width:580px; height:400px;" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="'+visurl+'&embed=1"></iframe>');
-    } else {
-      // Show warning note box (like screenshot)
-      $("#embedNote").show();
-      $("#embedNoteText").text("Some of the feeds selected are not public. To embed a visualization publicly, first make the feeds public on the feeds page.");
-
-      // Show private embed instructions in code box
-      $("#embedcode").text(
-        '<iframe style="width:580px; height:400px;" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="'+visurl+'&embed=1&apikey='+apikey+'"></iframe>'
-      );
-    }
-
+    if (publicfeed == 1) $("#embedcode").val('<iframe style="width:580px; height:400px;" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="'+visurl+'&embed=1"></iframe>'); 
+    else $("#embedcode").val('<?php echo addslashes(ctx_tr('vis_messages','Some of the feeds selected are not public, to embed a visualisation publicly first make the feeds that you want to use public.'));?>\n\n<?php echo ctx_tr('vis_messages','To embed privately:');?>\n\n<iframe style="width:580px; height:400px;" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="'+visurl+'&embed=1&apikey='+apikey+'"></iframe>');
   });
 
   //Edit the fullscreen button to not open a new window, but rather expand the current view to fullscreen
-$("#fullscreen").click(function () {
-  var $vis = $("#vispage");
+ $("#fullscreen").click(function () {
 
-  // 1) FIRST: measure current box
-  var first = $vis[0].getBoundingClientRect();
+    $("#vispage").addClass("fullscreen");
 
-  // Enter fullscreen state (final layout)
-  $vis.addClass("fullscreen");
+    // hide fullscreen button, show minimize
+    $("#fullscreen").hide();
+    $("#minimizebtn").show();
 
-  // (optional) fade menus as you already do
-  $("body").addClass("vis-fullscreen");
-
-  // 2) LAST: measure final box
-  var last = $vis[0].getBoundingClientRect();
-
-  // 3) INVERT: apply transform so it LOOKS like it never moved
-  var dx = first.left - last.left;
-  var dy = first.top - last.top;
-  var sx = first.width / last.width;
-  var sy = first.height / last.height;
-
-  $vis.addClass("animating");
-  $vis.css("transform", "translate(" + dx + "px," + dy + "px) scale(" + sx + "," + sy + ")");
-
-  // Force reflow so transform is applied before animating
-  $vis[0].offsetHeight;
-
-  // 4) PLAY: animate to the real fullscreen position
-  $vis.css("transform", "translate(0px,0px) scale(1,1)");
-
-  // swap buttons
-  $("#fullscreen").hide();
-  $("#minimizebtn").show();
-
-  // After animation finishes, clean up
-  setTimeout(function () {
-    $vis.removeClass("animating");
-    $vis.css("transform", "");
-
-    // Resize iframe AFTER container reaches fullscreen (cleaner)
     var width = $("#vispage").width();
     var height = $("#vispage").height() - 40;
 
-    var iframe = $("#visiframe").children("iframe");
-    if (iframe.length) {
-      iframe.width(width);
-      iframe.height(height);
-    } else {
-      // If no iframe yet, trigger render
-      $("#viewbtn").trigger("click");
-      $("#visiframe").children("iframe").width(width).height(height);
-    }
-  }, 420);
-});
+    var vistype = $("#visselect").val();
+    var visurl = path + "vis/" + vistype;
 
+    var options = [];
+    $(".options").each(function () {
+        if ($(this).val()) {
+            if ($(this).attr("type") == "color") {
+                var colour = $(this).val().replace("#", "");
+                options.push($(this).attr("id") + "=" + colour);
+            } else {
+                options.push($(this).attr("id") + "=" + encodeURIComponent($(this).val()));
+            }
+        }
+    });
+
+    visurl += "?" + options.join("&");
+
+    $("#visiframe").html(
+        '<iframe style="width:' + width + 'px; height:' + height + 'px;" ' +
+        'frameborder="0" scrolling="no" src="' + visurl + '&embed=1"></iframe>'
+    );
+});
 
 
   $("#minimizebtn").click(function () {
-  var $vis = $("#vispage");
 
-  // FIRST: measure fullscreen box
-  var first = $vis[0].getBoundingClientRect();
+    $("#vispage").removeClass("fullscreen");
 
-  // Remove fullscreen state (final layout back to normal)
-  $vis.removeClass("fullscreen");
-  $("body").removeClass("vis-fullscreen");
+    // show fullscreen button again, hide minimize
+    $("#fullscreen").show();
+    $("#minimizebtn").hide();
 
-  // LAST: measure normal box
-  var last = $vis[0].getBoundingClientRect();
-
-  // INVERT
-  var dx = first.left - last.left;
-  var dy = first.top - last.top;
-  var sx = first.width / last.width;
-  var sy = first.height / last.height;
-
-  $vis.addClass("animating");
-  $vis.css("transform", "translate(" + dx + "px," + dy + "px) scale(" + sx + "," + sy + ")");
-
-  $vis[0].offsetHeight;
-
-  // PLAY
-  $vis.css("transform", "translate(0px,0px) scale(1,1)");
-
-  $("#fullscreen").show();
-  $("#minimizebtn").hide();
-
-  setTimeout(function () {
-    $vis.removeClass("animating");
-    $vis.css("transform", "");
-
-    // Restore normal sizing + rerender
+    // Restore normal sizing
     vis_resize();
+
+    // Re-render normal view
     $("#viewbtn").trigger("click");
-  }, 420);
 });
-
-
 
 
 
