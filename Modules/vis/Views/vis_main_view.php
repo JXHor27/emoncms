@@ -36,6 +36,12 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 <script language="javascript" type="text/javascript" src="<?php echo $path; ?>Lib/bootstrap-datetimepicker-0.0.11/js/bootstrap-datetimepicker.min.js"></script>
 
 <h2><?php echo ctx_tr('vis_messages','Visualisations'); ?></h2>
+
+<!-- Fullscreen minimize button overlay (hidden by default) -->
+<button id="minimizebtn-overlay" type="button" class="btn btn-warning" style="display:none; position:fixed; top:20px; left:20px; z-index:10000; width:48px; height:48px; padding:0;margin-left: 30px; border-radius:8px; background:#fff; border:2px solid #ddd; box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+  <i class="icon-resize-small" style="font-size:24px; color:#666;"></i>
+</button>
+
 <div id="vispage">
 <table><tr valign="top"><td>
 <!--increase width of container to fit the text and dropdown on the same line-->
@@ -79,7 +85,7 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
                 </button>
 
                 <button id="minimizebtn" type="button" class="btn btn-warning" style="display:none; width:140px;padding:8px 20px; border-radius:6px; font-weight:bold; float: right; margin-right: 8px;">
-                  <i class="icon-resize-small" style="margin-right:6px; color: #ddd; "></i>
+                  <i class="icon-resize-small" style="margin-right:6px; color: #ddd; margin-left: 10px"></i>
                   Minimize
                 </button>
 
@@ -165,8 +171,33 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
   height: 100%;
   z-index: 9999;
   background: #fff;
-  padding: 10px;
+  padding: 0;
   overflow: hidden;
+}
+
+/* Hide table structure in fullscreen */
+#vispage.fullscreen table {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#vispage.fullscreen table tr,
+#vispage.fullscreen table td {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Hide left panel (options) in fullscreen */
+#vispage.fullscreen table td:first-child {
+  display: none !important;
 }
 
 /* FLIP animation support */
@@ -184,20 +215,6 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
   opacity: 1;
   transition: opacity 0.2s ease;
 }
-#visiframe.fading {
-  opacity: 0;
-}
-
-#vispage.fullscreen #vis_bound {
-  width: 100% !important;
-  height: calc(100% - 40px) !important;
-}
-
-
-/* Fade effect for iframe redraw */
-/* #visiframe {
-  opacity: 1;
-  transition: opacity 200ms ease; */
 
 #visiframe.fading {
   opacity: 0;
@@ -205,7 +222,13 @@ Part of the OpenEnergyMonitor project: http://openenergymonitor.org
 
 #vispage.fullscreen #vis_bound {
   width: 100% !important;
-  height: calc(100% - 40px) !important;
+  height: 100% !important;
+}
+
+#vispage.fullscreen #visiframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
 }
 </style>
 
@@ -324,18 +347,19 @@ $("#fullscreen").click(function () {
   // 4) PLAY: animate to the real fullscreen position
   $vis.css("transform", "translate(0px,0px) scale(1,1)");
 
-  // swap buttons
+  // swap buttons - show overlay minimize button
   $("#fullscreen").hide();
-  $("#minimizebtn").show();
+  $("#minimizebtn").hide();
+  $("#minimizebtn-overlay").show();
 
   // After animation finishes, clean up
   setTimeout(function () {
     $vis.removeClass("animating");
     $vis.css("transform", "");
 
-    // Resize iframe AFTER container reaches fullscreen (cleaner)
-    var width = $("#vispage").width();
-    var height = $("#vispage").height() - 40;
+    // Resize iframe AFTER container reaches fullscreen
+    var width = $(window).width();
+    var height = $(window).height();
 
     var iframe = $("#visiframe").children("iframe");
     if (iframe.length) {
@@ -351,7 +375,8 @@ $("#fullscreen").click(function () {
 
 
 
-  $("#minimizebtn").click(function () {
+  // Minimize button handlers (both old button and overlay)
+  $("#minimizebtn, #minimizebtn-overlay").click(function () {
   var $vis = $("#vispage");
 
   // FIRST: measure fullscreen box
@@ -380,6 +405,7 @@ $("#fullscreen").click(function () {
 
   $("#fullscreen").show();
   $("#minimizebtn").hide();
+  $("#minimizebtn-overlay").hide();
 
   setTimeout(function () {
     $vis.removeClass("animating");
