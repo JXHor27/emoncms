@@ -170,9 +170,8 @@ defined('EMONCMS_EXEC') or die('Restricted access');
 
                     <div class="node-header">
                         <div class="node-columns-header">
-                            <span class="col-label">Description</span>
-                            <span class="col-label">Processing</span>
-                            <!-- add more labels to match your columns if needed -->
+                            <span class="col-label" data-col="H">Description</span>
+                            <span class="col-label">Process</span>
                         </div>
                     </div>
 
