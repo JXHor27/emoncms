@@ -324,30 +324,26 @@ div#account {
     margin-bottom: .5em
 }
 
-/* Used by dashboard designer */
+/* Used by dashboard designer and feed controls */
 .controls {
-    transition: all .2s ease-out
+    transition: all .2s ease-out;
+    margin-bottom: 10px;
 }
-.controls.affix:before {
-    content: '';
-    background: var(--bg-menu-top-active);
-    opacity: 0.90;
-    width: 100%;
-    display: block;
-    position: fixed;
-    z-index: -1;
-    height: 2.6rem;
-    left: 0;
-    margin-top: -.3rem;
+
+/* Modern sticky controls (similar to input module) */
+.controls.affix {
+    position: sticky;
+    top: 3.5rem;
+    z-index: 10;
+    background: #fff;
+    padding: 6px 8px;
+    border-bottom: 1px solid #ddd;
 }
+
 .controls.affix > * {
     z-index: 2
 }
-.controls.affix {
-    z-index: 2;
-    top: 2.9rem;
-    padding: .3rem 0;
-}
+
 .controls.affix-top{position:absolute;}
 
 @media only screen and (max-width:979px) {

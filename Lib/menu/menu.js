@@ -41,7 +41,12 @@ var menu = {
         }
         
         menu.obj = obj;
-        
+
+        // Set initial sidebar state BEFORE drawing menus
+        // Always start with expanded sidebar for modern layout
+        menu.l2_min = false;
+        menu.l2_visible = true;
+
         // Detect and merge in any custom menu definition created by a view
         if (window.custom_menu!=undefined) {
             for (var l1 in custom_menu) {
@@ -73,9 +78,27 @@ var menu = {
         menu.log("init: draw_l1, events, resize");
         menu.draw_l1();
         menu.events();
+        
+        // Modern layout - sidebar expanded by default, collapsible
+        menu.l3_visible = false;
+
+        // Start with expanded sidebar, disable transitions during init
         menu.disable_transition(".menu-l2");
+        menu.disable_transition(".content-container");
+
+        if ($(window).width() >= 576) {
+            menu.l2_min = false;
+            menu.l2_visible = true;
+            menu.exp_l2();
+        } else {
+            menu.hide_l2();
+        }
+
+        menu.hide_l3();
         menu.resize();
+
         menu.enable_transition(".menu-l2");
+        menu.enable_transition(".content-container");
     },
 
     // ------------------------------------------------------------------    
@@ -128,10 +151,16 @@ var menu = {
             return menu.obj[menu.active_l1]['l2'][a]["order"] - menu.obj[menu.active_l1]['l2'][b]["order"];
         });
 
-        // Build level 2 menu (sidebar)
-        var menu_title_l2 = menu.obj[menu.active_l1]['name'];
-        if (menu_title_l2=="Setup") menu_title_l2 = "Emoncms";
-        var out = '<h4 class="menu-title-l2"><span>'+menu_title_l2+'</span></h4>';
+        // Build level 2 menu (sidebar) with EnergyMon brand header
+        var out = `
+          <div class="sidebar-brand">
+            <div class="brand-icon">
+              <img src="${path}Theme/emoncms-logo.png" alt="Emoncms" style="width: 100%; height: 100%; object-fit: contain;">
+            </div>
+            <div class="brand-text">Emoncms</div>
+          </div>
+        `;
+        
         for (var z in keys) {
             let l2 = keys[z];
             let item = menu.obj[menu.active_l1]['l2'][l2];
@@ -171,48 +200,26 @@ var menu = {
             }
         }
         
-        $(".menu-l2 ul").html(out); 
-        
+        $(".menu-l2 ul").html(out);
+
         if (menu.l2_min) {
             $(".menu-text-l2").hide();
-            $(".menu-title-l2 span").hide();
+            $(".sidebar-brand .brand-text").hide();
         } else {
             $(".menu-text-l2").show();
-            $(".menu-title-l2 span").show();
+            $(".sidebar-brand .brand-text").show();
         }
 
-        // If menu_l2 open and l2 menu item active and l3 exists: draw l3
-        if (menu.active_l2 && menu.obj[menu.active_l1]['l2'][menu.active_l2]!=undefined && menu.obj[menu.active_l1]['l2'][menu.active_l2]['l3']!=undefined) {
-            menu.log("draw_l2: draw_l3");
-            menu.draw_l3();
-        } else {
-            menu.log("draw_l2: exp_l2");
-            menu.exp_l2();
-        }
+        // In EnergyMon layout, don't auto-expand on draw
+        // Let init() control the initial state
     },
 
     // ------------------------------------------------------------------
-    // Level 3 (Sidebar submenu)
+    // Level 3 (Sidebar submenu) - DISABLED in EnergyMon layout
     // ------------------------------------------------------------------
     draw_l3: function () {
-        menu.log("draw_l3");
-        var out = '<div class="htop"></div><h3 class="l3-title mx-3">'+menu.obj[menu.active_l1]['l2'][menu.active_l2]['name']+'</h3>';
-        for (var l3 in menu.obj[menu.active_l1]['l2'][menu.active_l2]['l3']) {
-            let item = menu.obj[menu.active_l1]['l2'][menu.active_l2]['l3'][l3];
-            // Prepare active status
-            let active = ""; 
-            if (q.indexOf(item['href'])===0) {
-                active = "active";
-                menu.active_l3 = l3;
-            }
-            out += '<li><a href="'+path+item['href']+'" class="'+active+'">'+item['name']+'</a></li>';
-        }
-        $(".menu-l3 ul").html(out);
-
-        if (menu.active_l2 && menu.l2_min && menu.l2_visible) {
-            menu.log("draw_l3: show_l3");
-            menu.show_l3();
-        }
+        // L3 is not used in EnergyMon layout
+        menu.log("draw_l3: disabled in EnergyMon layout");
     },
     
     hide_menu_top: function () {
@@ -235,16 +242,16 @@ var menu = {
             menu.log("hide_l2: hide_l3");
             menu.hide_l3();
         }
-        
+
         if (menu.l2_visible) {
             $(".menu-text-l2").hide();
-            $(".menu-title-l2 span").hide();
+            $(".sidebar-brand .brand-text").hide();
             $(".menu-l2").css("width","0px");
             var ctrl = $("#menu-l2-controls");
-            ctrl.removeClass("ctrl-exp").removeClass("ctrl-min").addClass("ctrl-hide");
+            //ctrl.removeClass("ctrl-exp").removeClass("ctrl-min").addClass("ctrl-hide");
         }
 
-        $(".content-container").css("margin","46px auto 0 auto");
+        $(".content-container").css("margin-left","0");
         menu.l2_visible = false;
     },
 
@@ -254,18 +261,18 @@ var menu = {
             $(".menu-l2").css("width","50px");
 
             $(".menu-text-l2").hide();
-            $(".menu-title-l2 span").hide();
+            $(".sidebar-brand .brand-text").hide();
             var ctrl = $("#menu-l2-controls");
             ctrl.html('<svg class="icon"><use xlink:href="#icon-expand"></use></svg>');
-            ctrl.attr("title",_Tr_Menu("Expand sidebar")).removeClass("ctrl-hide").removeClass("ctrl-exp").addClass("ctrl-min");
+            //ctrl.attr("title",_Tr_Menu("Expand sidebar")).removeClass("ctrl-hide").removeClass("ctrl-exp").addClass("ctrl-min");
         }
 
         var window_width = $(window).width();
         var max_width = $(".content-container").css("max-width").replace("px","");
         if (max_width=='none' || window_width<max_width) {
-            $(".content-container").css("margin","46px 0 0 50px");
+            $(".content-container").css("margin-left","50px");
         } else {
-            $(".content-container").css("margin","46px auto 0 50px");
+            $(".content-container").css("margin-left","50px");
         }
 
         menu.l2_min = true;
@@ -276,53 +283,30 @@ var menu = {
     exp_l2: function () {
         clearTimeout(menu.auto_hide_timer);
         if (menu.l3_visible) {
-            menu.log("exp_l2: hide_l3");  
+            menu.log("exp_l2: hide_l3");
             menu.hide_l3();
         }
-    
-        if (!menu.l2_visible || menu.l2_min) {
-            $(".menu-l2").css("width","240px");
 
+        if (!menu.l2_visible || menu.l2_min) {
+            $(".menu-l2").css("width","260px");
             $(".menu-text-l2").show();
-            $(".menu-title-l2 span").show();
+            $(".sidebar-brand .brand-text").show();
+
             var ctrl = $("#menu-l2-controls");
             ctrl.html('<svg class="icon"><use xlink:href="#icon-contract"></use></svg>');
-            ctrl.attr("title",_Tr_Menu("Minimise sidebar")).removeClass("ctrl-hide").removeClass("ctrl-min").addClass("ctrl-exp");
+            //ctrl.attr("title",_Tr_Menu("Minimise sidebar")).removeClass("ctrl-hide").removeClass("ctrl-min").addClass("ctrl-exp");
         }
 
-        var left = 240;
-        if (menu.width<1150) {
-            left = 50;
-            menu.auto_hide_timer = setTimeout(function(){ if (menu.auto_hide && !menu.l3_visible) { menu.auto_hide = false; menu.min_l2(); } } ,4000); // auto hide 
-        }
-        $(".content-container").css("margin","46px 0 0 "+left+"px");
-        
+        // EnergyMon layout: set left margin for expanded sidebar
+        $(".content-container").css("margin-left","260px");
+
         menu.l2_min = false;
         menu.l2_visible = true;
     },
 
-    // If we show l3, min l2
+    // L3 is disabled in EnergyMon layout
     show_l3: function () {
-        clearTimeout(menu.auto_hide_timer);
-        if (!menu.l2_min || !menu.l2_visible) {
-            menu.log("show_l3: min_l2")
-            menu.min_l2();
-        }
-
-        if (!menu.l3_visible) { 
-            $(".menu-l3").css("left","50px");
-            $(".menu-l3").css("width","240px");
-            //$(".menu-l3").show();
-        }
-
-        var left = 290;
-        if (menu.width<1150) {
-            left = 50;
-            menu.auto_hide_timer = setTimeout(function(){ if (menu.auto_hide && menu.l3_visible) { menu.auto_hide = false; menu.hide_l3();} } ,4000); // auto hide 
-        }
-        $(".content-container").css("margin","46px 0 0 "+left+"px");
-
-        menu.l3_visible = true;
+        menu.log("show_l3: disabled in EnergyMon layout");
     },
 
     hide_l3: function () {
@@ -331,8 +315,6 @@ var menu = {
             $(".menu-l3").css("left","0px");
             $(".menu-l3").css("width","0px");
         }
-        if (menu.l2_visible) $(".content-container").css("margin","46px auto 0 50px");
-        else $(".content-container").css("margin","46px auto 0 auto");
         menu.l3_visible = false;
     },
 
@@ -349,51 +331,22 @@ var menu = {
     resize: function() {
         menu.width = $(window).width();
         menu.height = $(window).height();
-        
+
         if (!menu.is_disabled && menu.menu_top_visible) {
-            if (menu.mode=='auto') {
-                menu.auto_hide = true;
-                // Medium screen width: keep l2 minimised and show l3 if active
-                if (menu.width>=576 && menu.width<1150) {
-                    if (menu.active_l3) {
-                        if (!menu.l3_visible) {
-                            menu.log("resize: show_l3");
-                            menu.show_l3();
-                        }
-                    } else if (menu.active_l2) {
-                        if (!menu.l2_min || !menu.l2_visible) {
-                            menu.log("resize: min_l2");
-                            menu.min_l2();
-                        }
-                    }
-                // Small screen width: hide l2 (auto hides l3 aswell)
-                } else if (menu.width<576) {
-                    if (menu.l2_visible) {
-                        menu.log("resize: hide_l2");
-                        menu.hide_l2();
-                    }
-                // Large screen width: expand either l2 or show l3
+            if (menu.mode === "auto") {
+                // Small screens: collapse sidebar
+                if (menu.width < 576) {
+                    menu.hide_l2();
                 } else {
-                    // If l3 is active make sure it is visible
-                    if (menu.active_l3) {
-                        if (!menu.l3_visible) {
-                            menu.log("resize: show_l3");
-                            menu.show_l3();
-                        }
+                    // Desktop/tablet: keep sidebar in current state (minimized or expanded)
+                    // Don't force any particular state on resize
+                    if (!menu.l2_visible) {
+                        menu.min_l2();
                     }
-                    // else if l2 is active make sure it is expanded
-                    else if (menu.active_l2) {
-                        if (menu.l2_min || !menu.l2_visible) {                   
-                            menu.log("resize: exp_l2");
-                            menu.exp_l2();
-                        }
-                    }
+                    menu.hide_l3();
                 }
             }
-            if (menu.width>=1150 && menu.l2_visible && (!menu.l2_min || menu.l3_visible)) {
-                menu.mode = 'auto'
-            }
-            
+
             if (menu.width<576) {
                 $(".menu-text-l1").hide();
             } else {
@@ -413,8 +366,28 @@ var menu = {
 
     // -----------------------------------------------------------------------
     // Menu events
-    // -----------------------------------------------------------------------    
+    // -----------------------------------------------------------------------
     events: function() {
+
+        // Hamburger menu toggle
+        $("#hamburger-toggle").click(function(event){
+            event.stopPropagation();
+            menu.mode = 'manual';
+
+            if (menu.l2_visible && !menu.l2_min) {
+                // Currently expanded, minimize it
+                menu.log("hamburger: min_l2");
+                menu.min_l2();
+            } else if (menu.l2_visible && menu.l2_min) {
+                // Currently minimized, expand it
+                menu.log("hamburger: exp_l2");
+                menu.exp_l2();
+            } else {
+                // Currently hidden, show minimized
+                menu.log("hamburger: min_l2");
+                menu.min_l2();
+            }
+        });
 
         $(".menu-l1 li div").click(function(event){
             menu.last_active_l1 = menu.active_l1;
@@ -429,40 +402,16 @@ var menu = {
                 window.location = path+item['href']
             } else {
                 if (menu.active_l1!=menu.last_active_l1) {
-                    // new l1 menu clicked
-                    menu.min_l2();
-                    menu.auto_hide = true;
+                    // new l1 menu clicked - redraw sidebar
                     menu.draw_l2();
-                    if (item['l2'][menu.active_l2] != undefined && item['l2'][menu.active_l2]['l3']!=undefined) {
-                        menu.show_l3();
-                    }
-                    else { 
-                        menu.hide_l3();
-                        menu.exp_l2();
-                        
-                    }
                 } else {
-                    // same l1 menu clicked
-                    menu.auto_hide = false;
-                    if (!menu.l2_visible) {
-                        if (item['l2'][menu.active_l2] != undefined && item['l2'][menu.active_l2]['l3']!=undefined) {
-                            menu.log("l1 click: min_l2 & show_l3");
-                            menu.min_l2();
-                            menu.show_l3();
+                    // same l1 menu clicked - toggle sidebar on mobile
+                    if (menu.width < 576) {
+                        if (menu.l2_visible) {
+                            menu.hide_l2();
                         } else {
-                            menu.log("l1 click: exp_l2");
                             menu.exp_l2();
                         }
-                    } else if (menu.l2_visible && !menu.l2_min) {
-                        menu.log("l1 click: min_l2");
-                        menu.min_l2();
-                    } else if (menu.l2_visible && !menu.l3_visible && menu.l2_min) {
-                        menu.log("l1 click: hide_l2");
-                        menu.hide_l2();
-                    } else if (menu.l2_visible && menu.l2_min && menu.l3_visible) {
-                        menu.log("l1 click: min_l2 & hide_l3");
-                        menu.min_l2();
-                        menu.hide_l3();
                     }
                 }
                 $(window).trigger('resize');
@@ -477,26 +426,7 @@ var menu = {
             $(".menu-l2 li div").removeClass("active");
             // Set active class to current menu
             $(".menu-l2 li div[l2="+menu.active_l2+"]").addClass("active");
-            // If no sub menu then menu item is a direct link
-            if (item['l3']!=undefined) {
-                menu.mode = 'manual'
-                menu.auto_hide = false;
-                if (is_active && menu.active_l2 && !menu.l3_visible) {
-                    // Expand sub menu
-                    menu.log("l2 click: show_l3");
-                    menu.show_l3();
-                } else {
-                    // Commented for now seems to generate unwanted animation prior to page reload
-                    // menu.log("l2 click: hide_l3");
-                    // menu.hide_l3();
-                }
-                $(window).trigger('resize');
-            } else {
-                if (menu.active_l2 && menu.l3_visible) {
-                    // Commented for now seems to generate unwanted animation prior to page reload
-                    // menu.hide_l3(); // must be a direct link, dont triger resize here
-                }
-            }
+            // In EnergyMon layout, all L2 items are direct links (no L3)
         });
 
         $("#menu-l2-controls").click(function(event){
@@ -520,13 +450,41 @@ var menu = {
         $(window).scroll(function() {
           var scrollTop = $(window).scrollTop();
           var main = 0;
-          if ((scrollTop > main) && menu.menu_top_visible && !menu.l2_visible && !menu.l3_visible) { 
+          if ((scrollTop > main) && menu.menu_top_visible && !menu.l2_visible && !menu.l3_visible) {
               menu.log("scroll: hide_menu_top");
               menu.hide_menu_top();
           } else if (scrollTop <= main && !menu.menu_top_visible) {
               menu.log("scroll: show_menu_top");
               menu.show_menu_top();
           }
+        });
+
+        // Manual dropdown toggle for user menu
+        $(document).on('click', '#user-dropdown', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var $parent = $(this).closest('.dropdown');
+            var isOpen = $parent.hasClass('open');
+
+            // Close all dropdowns first
+            $('.dropdown').removeClass('open');
+
+            // Toggle this dropdown
+            if (!isOpen) {
+                $parent.addClass('open');
+            }
+        });
+
+        // Close dropdown when clicking outside
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.dropdown').length) {
+                $('.dropdown').removeClass('open');
+            }
+        });
+
+        // Prevent dropdown from closing when clicking inside it
+        $(document).on('click', '.dropdown-menu', function(e) {
+            e.stopPropagation();
         });
     },
     
