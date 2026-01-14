@@ -68,9 +68,6 @@ if (!in_array($settings["interface"]["themecolor"], ["blue","sun","yellow2","sta
 <body class="fullwidth <?php if(isset($page_classes)) echo implode(' ', $page_classes) ?>">
     <div id="wrap">
         <div class="menu-top bg-menu-top">
-            <!-- <div class="hamburger-menu" id="hamburger-toggle" title="Toggle sidebar">
-                <svg class="icon" style="width: 20px; height: 20px;"><use xlink:href="#icon-menu"></use></svg>
-            </div> -->
             <div class="menu-l1"><ul></ul></div>
             <div class="menu-tr"><ul>
 
@@ -102,7 +99,7 @@ if (!in_array($settings["interface"]["themecolor"], ["blue","sun","yellow2","sta
         </div>
         <div class="menu-l2">
             <div class="menu-l2-inner"><ul></ul></div>
-            <!-- <div id="menu-l2-controls" class="ctrl-hide"></div> -->
+            <div id="menu-l2-controls" class="menu-l2-controls"></div>
         </div>
             <div class="menu-l3"><ul></ul></div>
         <?php
