@@ -155,7 +155,7 @@ var menu = {
         var out = `
           <div class="sidebar-brand">
             <div class="brand-icon">
-              <img src="${path}Theme/emoncms-logo.png" alt="Emoncms" style="width: 100%; height: 100%; object-fit: contain;">
+              <img src="${path}Theme/emoncms-logo.png" alt="Emoncms" style="width: 100%; height: 100%; object-fit: contain; margin: auto;">
             </div>
             <div class="brand-text">Emoncms</div>
           </div>
@@ -258,7 +258,9 @@ var menu = {
     min_l2: function () {
         clearTimeout(menu.auto_hide_timer);
         if (!(menu.l2_visible && menu.l2_min)) {
-            $(".menu-l2").css("width","50px");
+            $(".menu-l2").css("width","80px");
+            $(".menu-l2").addClass("minimized");
+            document.documentElement.style.setProperty('--sidebar-w', '80px');
 
             $(".menu-text-l2").hide();
             $(".sidebar-brand .brand-text").hide();
@@ -270,9 +272,9 @@ var menu = {
         var window_width = $(window).width();
         var max_width = $(".content-container").css("max-width").replace("px","");
         if (max_width=='none' || window_width<max_width) {
-            $(".content-container").css("margin-left","50px");
+            $(".content-container").css("margin-left","80px");
         } else {
-            $(".content-container").css("margin-left","50px");
+            $(".content-container").css("margin-left","80px");
         }
 
         menu.l2_min = true;
@@ -289,6 +291,8 @@ var menu = {
 
         if (!menu.l2_visible || menu.l2_min) {
             $(".menu-l2").css("width","260px");
+            $(".menu-l2").removeClass("minimized");
+            document.documentElement.style.setProperty('--sidebar-w', '260px');
             $(".menu-text-l2").show();
             $(".sidebar-brand .brand-text").show();
 
