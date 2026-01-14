@@ -170,9 +170,8 @@ defined('EMONCMS_EXEC') or die('Restricted access');
 
                     <div class="node-header">
                         <div class="node-columns-header">
-                            <span class="col-label">Description</span>
-                            <span class="col-label">Processing</span>
-                            <!-- add more labels to match your columns if needed -->
+                            <span class="col-label" data-col="I">Description</span>
+                            <span class="col-label">Process</span>
                         </div>
                     </div>
 
@@ -198,7 +197,7 @@ defined('EMONCMS_EXEC') or die('Restricted access');
                                 <input class="input-select" type="checkbox" :value="input.id" v-model="selected">
                             </div>
                             <div class="name text-nowrap" data-col="A" :style="{width:col.A+'px'}">{{ input.name }}</div>
-                            <div class="description text-nowrap" data-col="G" :style="{width:col.G+'px'}">{{ formatDescription(input.description) }}</div>
+                            <div class="description text-nowrap" data-col="H" :style="{width:col.H+'px'}">{{ formatDescription(input.description) }}</div>
                             <div class="processlist" data-col="H" :style="{width:col.H+'px', height:col_h.H}">
                                 <div class="label-container line-height-normal" v-html=input.processlistHtml></div>
                             </div>

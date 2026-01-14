@@ -200,6 +200,7 @@ input.checkbox-lg {
 [data-col="E"] { width: 120px; } /* also controlled below */
 [data-col="F"] { width: 50px; }
 [data-col="G"] { width: 200px; }
+[data-col="I"] { width: 320px; }
 
 /* Last updated column (center aligned) */
 .device-last-updated,
@@ -239,7 +240,7 @@ input.checkbox-lg {
 .node-columns-header {
     margin-left: auto;
     display: flex;
-    gap: 2rem;
+    /* gap: 2rem; */
     font-weight: bold;
     font-size: .9rem;
     opacity: .8;
