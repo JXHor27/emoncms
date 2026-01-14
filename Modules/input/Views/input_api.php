@@ -80,6 +80,7 @@ global $path, $session, $user;
 
 .api-key-box input[type="text"] {
     width: 100%;
+    box-sizing: border-box;
     padding: 12px 15px;
     border: 1px solid #ddd;
     border-radius: 6px;
