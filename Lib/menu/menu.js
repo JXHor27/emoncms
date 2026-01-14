@@ -210,6 +210,14 @@ var menu = {
             $(".sidebar-brand .brand-text").show();
         }
 
+        // Ensure the sidebar control icon is present on initial render
+        var ctrl = $("#menu-l2-controls");
+        if (menu.l2_min) {
+            ctrl.html('<svg class="icon"><use xlink:href="#icon-expand"></use></svg>');
+        } else {
+            ctrl.html('<svg class="icon"><use xlink:href="#icon-contract"></use></svg>');
+        }
+
         // In EnergyMon layout, don't auto-expand on draw
         // Let init() control the initial state
     },

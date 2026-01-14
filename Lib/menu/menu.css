@@ -42,7 +42,7 @@ body {
   transition: all 0.3s ease-out;
   left: var(--sidebar-w);
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
   padding: 0 24px;
   overflow: hidden;
@@ -336,6 +336,7 @@ ul.dropdown-menu.pull-right {
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
+  padding-left: 10px;
 }
 
 .sidebar-brand .brand-icon img {
@@ -453,6 +454,21 @@ ul.dropdown-menu.pull-right {
 
 #menu-l2-controls:hover {
   background-color: var(--sidebar-hover-bg);
+}
+
+/* Ensure the control icon is always visible and on top */
+#menu-l2-controls {
+  z-index: 1005;
+}
+
+#menu-l2-controls svg.icon {
+  width: 20px;
+  height: 20px;
+  fill: var(--sidebar-active-text);
+}
+
+.menu-l2.minimized #menu-l2-controls svg.icon {
+  fill: var(--sidebar-active-text);
 }
 
 /* ========== L3 Menu (Disabled) ========== */
