@@ -239,6 +239,9 @@ class User
                         $userData = $result->fetch_object();
                         if ($userData->id != 0)
                         {
+                            // Regenerate session ID when logging in via remember-me token
+                            session_regenerate_id(true);
+
                             $_SESSION['userid'] = $userData->id;
                             $_SESSION['username'] = $userData->username;
                             $_SESSION['read'] = 1;
@@ -253,9 +256,9 @@ class User
                         }
                     }
                 } else {
-                    // if($this->rememberme->loginTokenWasInvalid()) {
-                    //    $this->logout(); // Stolen
-                    // }
+                    if($this->rememberme->loginTokenWasInvalid()) {
+                        $this->logout(); // Stolen
+                    }
                 }
             }
         }
@@ -441,7 +444,12 @@ class User
         }
         else
         {
-            session_regenerate_id();
+            // Ensure session is active before regenerating
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+
+            session_regenerate_id(true);
             $_SESSION['userid'] = $userData->id;
             $_SESSION['username'] = $username;
             $_SESSION['read'] = 1;
