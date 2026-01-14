@@ -82,12 +82,23 @@
                 </dl>
             </div>
             
+            <!-- Success/Error Message -->
+            <transition name="fade">
+                <div v-if="message" class="alert mt-3" :class="{'alert-success': success, 'alert-error': !success && deleting, 'alert-info': deleting && !success}">
+                    <i :class="{'icon-ok': success, 'icon-exclamation-sign': !success && !deleting, 'icon-spinner icon-spin': deleting && !success}"></i>
+                    {{ message }}
+                </div>
+            </transition>
+            
             <div id="inputs-to-delete"></div>
             <div id="inputDelete-loader" class="ajax-loader" style="display:none;"></div>
         </div>
         <div class="modal-footer">
-            <button @click="closeModal" class="btn"><?php echo tr('Cancel'); ?></button>
-            <button @click="confirm" class="btn" :class="buttonClass">{{buttonLabel}}</button>
+            <button @click="closeModal" class="btn" :disabled="deleting"><?php echo tr('Cancel'); ?></button>
+            <button @click="confirm" class="btn" :class="buttonClass" :disabled="deleting || success">
+                <i v-if="deleting" class="icon-spinner icon-spin"></i>
+                {{buttonLabel}}
+            </button>
         </div>
     </div>
     <div @click="closeModal" class="modal-backdrop" :class="{'hide': hidden}"></div>
@@ -137,6 +148,100 @@
                 <button @click="closeModal" class="btn" aria-hidden="true" type="button"><?php echo tr('Close'); ?></button>
                 <button class="multiple btn btn-primary" type="button" @click="saveAll"><?php echo tr('Save All'); ?></button>
             </div>
+        </div>
+    </div>
+    <div @click="closeModal" class="modal-backdrop" :class="{'hide': hidden}"></div>
+</div>
+
+
+<!-- Modal to confirm disabling input creation -->
+<div id="disableInputCreationModal" v-cloak>
+    <div class="modal" :class="{'hide': hidden}" tabindex="-1" role="dialog" aria-labelledby="disableInputCreationModalLabel" aria-hidden="true" data-backdrop="static">
+        <div class="modal-header">
+            <button @click="closeModal" type="button" class="close" aria-hidden="true">×</button>
+            <h3 id="disableInputCreationModalLabel"><?php echo tr('Disable Input Creation'); ?></h3>
+        </div>
+        <div class="modal-body">
+            <div class="alert alert-warning d-inline-block">
+                <i class="icon-warning-sign"></i>
+                <?php echo tr('New inputs and devices will not appear automatically until re-enabled.'); ?>
+            </div>
+            <h4><?php echo tr('Are you sure you want to disable further input creation?'); ?></h4>
+            <p><?php echo tr('This can be useful if spurious inputs are being created. You can re-enable input creation at any time from the inputs page.'); ?></p>
+        </div>
+        <div class="modal-footer">
+            <button @click="closeModal" class="btn"><?php echo tr('Cancel'); ?></button>
+            <button @click="confirm" class="btn btn-warning">
+                <i class="icon-lock"></i> <?php echo tr('Disable Input Creation'); ?>
+            </button>
+        </div>
+    </div>
+    <div @click="closeModal" class="modal-backdrop" :class="{'hide': hidden}"></div>
+</div>
+
+
+<!-- Modal to confirm cleaning unused inputs -->
+<div id="cleanInputsModal" v-cloak>
+    <div class="modal" :class="{'hide': hidden}" tabindex="-1" role="dialog" aria-labelledby="cleanInputsModalLabel" aria-hidden="true" data-backdrop="static">
+        <div class="modal-header">
+            <button @click="closeModal" type="button" class="close" aria-hidden="true">×</button>
+            <h3 id="cleanInputsModalLabel"><?php echo tr('Clean Unused Inputs'); ?></h3>
+        </div>
+        <div class="modal-body">
+            <div class="alert alert-danger d-inline-block">
+                <i class="icon-warning-sign"></i>
+                <?php echo tr('This action will permanently delete inactive and unconfigured inputs.'); ?>
+            </div>
+            <h4>{{ message }}</h4>
+            <p><?php echo tr('This action cannot be undone. Only inactive inputs without any process configuration will be removed.'); ?></p>
+        </div>
+        <div class="modal-footer">
+            <button @click="closeModal" class="btn"><?php echo tr('Cancel'); ?></button>
+            <button @click="confirm" class="btn btn-danger">
+                <i class="icon-trash"></i> <?php echo tr('Clean Unused Inputs'); ?>
+            </button>
+        </div>
+    </div>
+    <div @click="closeModal" class="modal-backdrop" :class="{'hide': hidden}"></div>
+</div>
+
+
+<!-- Modal to show device key -->
+<div id="deviceKeyModal" v-cloak>
+    <div class="modal" :class="{'hide': hidden}" tabindex="-1" role="dialog" aria-labelledby="deviceKeyModalLabel" aria-hidden="true" data-backdrop="static">
+        <div class="modal-header">
+            <button @click="closeModal" type="button" class="close" aria-hidden="true">×</button>
+            <h3 id="deviceKeyModalLabel"><?php echo tr('Device API Key'); ?></h3>
+        </div>
+        <div class="modal-body">
+            <h4>{{ deviceName }}</h4>
+            <div v-if="hasKey">
+                <p><?php echo tr('Use this write API key to post data to this specific device:'); ?></p>
+                <div class="input-append" style="width: 100%;">
+                    <input ref="deviceKeyInput" 
+                           type="text" 
+                           :value="devicekey" 
+                           readonly 
+                           class="form-control" 
+                           style="width: calc(100% - 100px); font-family: monospace;"
+                           @click="$event.target.select()">
+                    <button @click="copyToClipboard" class="btn btn-primary" type="button">
+                        <i class="icon-copy"></i> <?php echo tr('Copy'); ?>
+                    </button>
+                </div>
+                <p class="text-muted muted mt-2">
+                    <small><i class="icon-info-sign"></i> <?php echo tr('This key allows posting data to this device only.'); ?></small>
+                </p>
+            </div>
+            <div v-else>
+                <div class="alert alert-info">
+                    <i class="icon-info-sign"></i>
+                    {{ devicekey }}
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button @click="closeModal" class="btn btn-primary"><?php echo tr('Close'); ?></button>
         </div>
     </div>
     <div @click="closeModal" class="modal-backdrop" :class="{'hide': hidden}"></div>
