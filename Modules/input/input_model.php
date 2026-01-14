@@ -48,6 +48,7 @@ class Input
 
             if ($this->redis && $id>0) {
                 $this->redis->sAdd("user:inputs:$userid", $id);
+                $this->redis->sAdd("node:inputs:$userid:$nodeid", $id);
                 $this->redis->hMSet("input:$id",array('id'=>$id,'nodeid'=>$nodeid,'name'=>$name,'description'=>"", 'processList'=>""));
             }
         } else {
@@ -128,6 +129,44 @@ class Input
                 $stmt->execute();
                 $stmt->close();
             }
+        }
+    }
+
+    public function set_timevalue_batch($updates)
+    {
+        if (empty($updates)) return;
+        // Build the Values String
+        // Format: (id, time, value), (id, time, value)...
+        $values = [];
+        $types = "";
+        $params = [];
+
+        foreach ($updates as $row) {
+            $values[] = "(?, ?, ?)";
+            $types .= "iid"; // integer, integer, double
+            $params[] = (int) $row['id'];
+            $params[] = (int) $row['time'];
+            $params[] = $row['value'];  // Dont cast
+        }
+
+        $values_str = implode(", ", $values);
+        // Try to insert. If ID exists, update the time and value instead.
+        $sql = "INSERT INTO input (id, time, value) VALUES $values_str 
+                ON DUPLICATE KEY UPDATE 
+                time = VALUES(time), 
+                value = VALUES(value)";
+
+        $stmt = $this->mysqli->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        
+        if ($this->redis) {
+            $pipe = $this->redis->multi(Redis::PIPELINE);
+            foreach ($updates as $row) {
+                $key = "input:lastvalue:" . $row['id'];
+                $pipe->hMset($key, ['time' => $row['time'], 'value' => $row['value']]);
+            }
+            $pipe->exec();
         }
     }
 
@@ -247,12 +286,10 @@ class Input
 
         $dbinputs = array();
         $inputids = $this->redis->sMembers("user:inputs:$userid");
-
         if ($inputids==null) {
             $this->load_to_redis($userid);
             $inputids = $this->redis->sMembers("user:inputs:$userid");
         }
-
         $pipe = $this->redis->multi(Redis::PIPELINE);
         foreach ($inputids as $id) $row = $this->redis->hGetAll("input:$id");
         $result = $pipe->exec();
@@ -276,6 +313,67 @@ class Input
             if (!isset($dbinputs[$row['nodeid']])) $dbinputs[$row['nodeid']] = array();
             $dbinputs[$row['nodeid']][$row['name']] = array('id'=>$row['id'], 'processList'=>$row['processList']);
         }
+        return $dbinputs;
+    }
+    
+    public function get_inputs_by_node($userid, $nodeid)
+    {
+        $userid = (int) $userid;
+        // Sanitize nodeid 
+        $nodeid_safe = preg_replace('/[^\p{N}\p{L}_\s\-.]/u', '', $nodeid);
+        $dbinputs = array();
+        if ($this->redis) {
+            $node_key = "node:inputs:$userid:$nodeid";
+            
+            // Try to get input IDs from specific node set
+            $inputids = $this->redis->sMembers($node_key);
+
+            // Cache miss, load from DB specifically for this node
+            if (empty($inputids)) {
+                $count = $this->load_node_to_redis($userid, $nodeid_safe);
+                if ($count > 0) {
+                    $inputids = $this->redis->sMembers($node_key);
+                }
+            }
+            echo "Input IDs for user '$userid': and node '$nodeid' " . implode(", ", $inputids) . "\n";
+
+            // Fetch details with Redis pipeline
+            if (!empty($inputids)) {
+                $pipe = $this->redis->multi(Redis::PIPELINE);
+                foreach ($inputids as $id) {
+                    $pipe->hGetAll("input:$id");
+                }
+                $result = $pipe->exec();
+                if (!isset($dbinputs[$nodeid])) $dbinputs[$nodeid] = array();
+                foreach ($result as $row) {
+                    if ($row && isset($row['name'])) {
+                        $dbinputs[$nodeid][$row['name']] = array(
+                            'id' => $row['id'], 
+                            'processList' => isset($row['processList']) ? $row['processList'] : ''
+                        );
+                    }
+                }
+                return $dbinputs;
+            }
+            // If still empty here, it means the node truly has no inputs.
+            return array();
+        }
+
+        // Fallback to MySQL if redis not exist
+        // Added nodeid filter to reduce data fetched from DB
+        $stmt = $this->mysqli->prepare("SELECT id,nodeid,name,description,processList FROM input WHERE userid=? AND nodeid=? ORDER BY name asc");
+        $stmt->bind_param("is", $userid, $nodeid_safe);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if (!isset($dbinputs[$nodeid])) $dbinputs[$nodeid] = array();
+        
+        while ($row = $result->fetch_assoc()) {
+            $dbinputs[$nodeid][$row['name']] = array(
+                'id' => $row['id'], 
+                'processList' => $row['processList']
+            );
+        }
+        
         return $dbinputs;
     }
 
@@ -493,14 +591,34 @@ class Input
     {
         $userid = (int) $userid;
         $inputid = (int) $inputid;
+
+        // Get nodeid of input to clean up specific Redis set
+        $nodeid = null;
+        if ($this->redis) {
+            $nodeid = $this->redis->hGet("input:$inputid", 'nodeid');
+        }
+        // Fallback to MySQL(e.g. Redis cache expires)
+        if (!$nodeid) {
+            $result = $this->mysqli->query("SELECT nodeid FROM input WHERE id = $inputid");
+            if ($row = $result->fetch_object()) {
+                $nodeid = $row->nodeid;
+            }
+        }
         // Inputs are deleted permanentely straight away rather than a soft delete
         // as in feeds - as no actual feed data will be lost
         $this->mysqli->query("DELETE FROM input WHERE userid = '$userid' AND id = '$inputid'");
 
         if ($this->redis) {
-            $this->redis->del("input:$inputid");
-            $this->redis->del("input:lastvalue:$inputid");
-            $this->redis->srem("user:inputs:$userid",$inputid);
+            $pipe = $this->redis->multi(Redis::PIPELINE);
+            $pipe->del("input:$inputid");
+            $pipe->del("input:lastvalue:$inputid");
+            $pipe->srem("user:inputs:$userid",$inputid);
+            if ($nodeid !== null) {
+                // Sanitize nodeid to match how it was saved
+                $nodeid_safe = preg_replace('/[^\p{N}\p{L}_\s\-.]/u', '', $nodeid);
+                $pipe->srem("node:inputs:$userid:$nodeid_safe", $inputid);
+            }
+            $pipe->exec();
         }
 
         return array(
@@ -513,14 +631,57 @@ class Input
 
     // userid and inputids are checked in belongs_to_user and delete
     public function delete_multiple($userid, $inputids) {
-        foreach ($inputids as $inputid) {
-            if ($this->belongs_to_user($userid, $inputid)) $this->delete($userid, $inputid);
+         $userid = (int) $userid;
+
+        // Sanitize IDs to prevent SQL injection in the IN clause
+        $valid_ids = array_map('intval', $inputids);
+        if (empty($valid_ids)) {
+            return array('success'=>false, 'message'=>'No valid inputs specified');
         }
+
+        // Optimize database to a single batch query with IN clause
+        // Convert array [1, 2, 3] to string "1,2,3"
+        $ids_string = implode(',', $valid_ids);
+
+        // Retrieve nodeid for every input to clean up specific Redis set
+        $node_map = [];
+        $result = $this->mysqli->query("SELECT id, nodeid FROM input WHERE userid = '$userid' AND id IN ($ids_string)");
+        
+        while ($row = $result->fetch_object()) {
+            // Sanitize nodeid to match how it was saved
+            $nodeid_safe = preg_replace('/[^\p{N}\p{L}_\s\-.]/u', '', $row->nodeid);
+            $node_map[$row->id] = $nodeid_safe;
+        }
+
+        // Include userid in WHERE clause to implicitly replace 'belongs_to_user' check
+        $this->mysqli->query("DELETE FROM input WHERE userid = '$userid' AND id IN ($ids_string)");
+
+        if ($this->redis) {
+            $keys_to_delete = [];
+            $pipe = $this->redis->multi(Redis::PIPELINE);
+
+            foreach ($valid_ids as $id) {
+                $keys_to_delete[] = "input:$id";
+                $keys_to_delete[] = "input:lastvalue:$id";
+                // Remove from global user set
+                $pipe->srem("user:inputs:$userid", $id);
+                // Remove from specific node set 
+                if (isset($node_map[$id])) {
+                    $nodeid = $node_map[$id];
+                    $pipe->srem("node:inputs:$userid:$nodeid", $id);
+                }
+            }
+            if (!empty($keys_to_delete)) {
+                $this->redis->del($keys_to_delete);
+            }
+            $pipe->exec();
+        }
+
         return array(
-            'success'=>true, 
-            'message'=>'Inputs deleted',
-            'userid'=>$userid,
-            'inputids'=>$inputids
+        'success'=>true, 
+        'message'=>'Inputs deleted',
+        'userid'=>$userid,
+        'inputids'=>$inputids
         );
     }
 
@@ -711,6 +872,38 @@ class Input
                 'processList'=>$row->processList
             ));
         }
+    }
+
+    private function load_node_to_redis($userid, $nodeid)
+    {   
+        echo "Loading inputs for user $userid and node $nodeid into Redis cache...\n";
+        $userid = (int) $userid;
+        // Fetch only inputs for this node from MySQL
+        $stmt = $this->mysqli->prepare("SELECT id,userid,nodeid,name,description,processList FROM input WHERE userid=? AND nodeid=?");
+        $stmt->bind_param("is", $userid, $nodeid);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $count = 0;
+        if ($this->redis) {
+            $pipe = $this->redis->multi(Redis::PIPELINE);
+            
+            while ($row = $result->fetch_object()) {
+                // Add to specific node set
+                $pipe->sAdd("node:inputs:$userid:$nodeid", $row->id);
+                // Add to global user set (Keep data consistent & Backward compatible)
+                $pipe->sAdd("user:inputs:$userid", $row->id);
+                $pipe->hMSet("input:$row->id", array(
+                    'id' => $row->id,
+                    'nodeid' => $row->nodeid,
+                    'name' => $row->name,
+                    'description' => $row->description,
+                    'processList' => $row->processList
+                ));
+                $count++;
+            }
+            $pipe->exec();
+        }
+        return $count;
     }
 
 
