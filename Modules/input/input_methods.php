@@ -61,8 +61,8 @@ class InputMethods
         } else {
             $time = time();
         }
-
-        $result = $this->process_node($userid,$time,$nodeid,$payload['inputs']);
+        $dbinputs = $this->input->get_inputs_by_node($userid, $nodeid);
+        $result = $this->process_node($userid,$time,$nodeid,$payload['inputs'], $dbinputs);
         if ($result!==true) return $result;
 
         return "ok";
@@ -184,8 +184,9 @@ class InputMethods
             );
         }
 
+        $dbinputs = $this->input->get_inputs($userid);  // Fetch once for all packets before processing
         foreach ($packets as $packet) {
-            $result = $this->process_node($userid,$packet['time'],$packet['nodeid'],$packet['inputs']);
+            $result = $this->process_node($userid,$packet['time'],$packet['nodeid'],$packet['inputs'], $dbinputs);
             if ($result!==true) return $result;
         }
 
@@ -196,9 +197,12 @@ class InputMethods
     // Register and process the inputs for the node given
     // This function is used by all input methods
     // ------------------------------------------------------------------------------------
-    public function process_node($userid,$time,$nodeid,$inputs)
+    public function process_node($userid,$time,$nodeid,$inputs,&$dbinputs=null)
     {
-        $dbinputs = $this->input->get_inputs($userid);
+        // Backward compatible for other direct calls other than post() and bulk()
+        if ($dbinputs===null) {
+            $dbinputs = $this->input->get_inputs($userid); // Fetch all inputs for user
+        }
         $nodeid = preg_replace('/[^\p{N}\p{L}_\s\-.]/u','',$nodeid);
         if ($nodeid=="") $nodeid = 0;
 
@@ -470,7 +474,13 @@ class InputMethods
                 $dbinputs[$nodeid][$name] = array('id' => $inputid, 'processList' => '');
             }
             $inputid = $dbinputs[$nodeid][$name]['id'];
-            $this->input->set_timevalue($inputid, $time, $value);
+            // Buffer first instead of write directly
+            // Legacy way: $this->input->set_timevalue($inputid, $time, $value);
+            $batch_buffer[] = [
+                'id' => $inputid, 
+                'time' => $time, 
+                'value' => $value
+            ];
             if ($dbinputs[$nodeid][$name]['processList']) {
                 $to_process[] = array(
                     'value' => $value,
@@ -479,6 +489,10 @@ class InputMethods
                 );
             }
             if (isset($_GET['mqttpub'])) $this->process->publish_to_mqtt("emon/$nodeid/$name",$time,$value);
+        }
+        // Flush the buffer, one query to update all inputs for this node
+        if (!empty($batch_buffer)) {
+            $this->input->set_timevalue_batch($batch_buffer);
         }
         foreach ($to_process as $i) $this->process->input($time, $i['value'], $i['processList'], $i['opt']);
     }
