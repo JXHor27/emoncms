@@ -200,7 +200,7 @@ input.checkbox-lg {
 [data-col="E"] { width: 120px; } /* also controlled below */
 [data-col="F"] { width: 50px; }
 [data-col="G"] { width: 200px; }
-[data-col="H"] { width: 320px; }
+[data-col="I"] { width: 320px; }
 
 /* Last updated column (center aligned) */
 .device-last-updated,
