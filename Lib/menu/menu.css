@@ -1,25 +1,95 @@
-/* -------------------------------------- */
+/* ========== Modern Layout Constants ========== */
+:root{
+  --sidebar-w: 260px;
+  --sidebar-margin: 24px;
+  --topbar-h: 56px;
+  --topbar-bg: #f8f9fa;
+  --topbar-border: #e9ecef;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e9ecef;
+  --sidebar-text: #495057;
+  --sidebar-muted: #6c757d;
+  --sidebar-active-bg: #e7f5ff;
+  --sidebar-active-text: #0c8599;
+  --sidebar-hover-bg: #f8f9fa;
+  --content-bg: #f5f7fa;
+  --card-bg: #ffffff;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+}
 
+/* ========== Global Styles ========== */
+body {
+  background-color: var(--content-bg) !important;
+  color: var(--text-primary);
+}
+
+#wrap {
+  background-color: var(--content-bg);
+}
+
+/* ========== Top Bar ========== */
 .menu-top {
-  height:46px;
-  width:100%;
-  z-index:1001;
-  position:fixed;
-  top:0px;
-  background-color:var(--bg-menu-top);
-  box-shadow: 0 2px 4px -1px rgb(0 0 0 / 25%);
+  height: var(--topbar-h);
+  width: calc(100% - var(--sidebar-w) - var(--sidebar-margin));
+  max-width: calc(100% - var(--sidebar-w));
+  z-index: 1003;
+  position: fixed;
+  top: 0px;
+  background-color: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease-out;
+  left: var(--sidebar-w);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  overflow: hidden;
+}
+
+.hamburger-menu {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  flex-shrink: 0;
+  border-radius: 6px;
+  margin-right: 12px;
+}
+
+.hamburger-menu svg.icon {
+  fill: var(--sidebar-text);
+}
+
+.hamburger-menu:hover {
+  background-color: var(--sidebar-hover-bg);
 }
 
 .menu-top-hide {
-  top:-46px;
+  top: calc(-1 * var(--topbar-h));
   transition: all 0.3s ease-out;
 }
 
+/* Top bar left side (navigation) */
+.menu-l1 {
+  float: none;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  flex: 0 1 auto;
+}
+
 .menu-l1 ul {
-  list-style:none;
-  margin:0px;
-  padding:0px;
+  list-style: none;
+  margin: 0px;
+  padding: 0px;
+  display: flex;
+  gap: 2px;
+  align-items: center;
 }
 
 .menu-l1 li {
@@ -32,178 +102,373 @@
 
 .menu-l1 li div {
   text-decoration: none;
-  color: #fff;
-
-  height: 24px;
-  padding: 11px 13px 11px 13px;
-  cursor:pointer;
-  font-size:1.5rem;
-  transition: all 0.1s ease-out;
+  color: var(--text-primary);
+  height: 40px;
+  padding: 0 16px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
+  font-weight: 500;
 }
 
 .menu-l1 li div:hover {
-  background-color:var(--bg-menu-top-hover);
+  background-color: var(--sidebar-hover-bg);
 }
 
 .menu-l1 .active {
-  background-color:var(--bg-menu-top-active);
+  background-color: var(--sidebar-active-bg);
+  color: var(--sidebar-active-text);
 }
 
-.menu-l1 { float:left; }
+.menu-l1 li div svg.icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
 .menu-text-l1 {
-  display:inline-block;
-  font-size:1rem;
-  margin-left:3px;
+  display: inline-block;
+  font-size: 0.95rem;
+  margin-left: 0;
   vertical-align: middle;
+  font-weight: 500;
 }
 
-.menu-tr { float:right; }
+/* Right side user area */
+.menu-tr {
+  float: none;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+}
 
 .menu-tr ul {
-  list-style:none;
-  margin:0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+}
+
+.menu-tr li {
+  position: relative;
+  display: block;
 }
 
 .menu-tr li div {
   text-decoration: none;
-  color: #fff;
-  height: 24px;
-  padding: 11px 13px 11px 13px;
-  cursor:pointer;
-  font-size:1.5rem;
-  background-color:var(--bg-menu-tr);
+  color: var(--text-primary);
+  height: 40px;
+  width: 40px;
+  padding: 0;
+  cursor: pointer;
+  font-size: 1.2rem;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.15s ease;
 }
 
 .menu-tr li div:hover {
-  background-color:var(--bg-menu-tr-hover);
+  background-color: var(--sidebar-hover-bg);
 }
 
-.dropdown-menu svg.icon {
-  fill:#000;
+/* Dropdown menu - hidden by default */
+ul.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1004;
+  min-width: 180px;
+  padding: 8px 0;
+  margin: 0;
+  background-color: #fff;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  list-style: none;
+  float: none;
+}
+
+/* Show dropdown when open class is added */
+.dropdown.open ul.dropdown-menu {
+  display: block !important;
+}
+
+/* Ensure dropdown-menu items are stacked vertically */
+ul.dropdown-menu > li {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: block !important;
+  width: 100%;
+  float: none !important;
+}
+
+ul.dropdown-menu > li > a {
+  display: flex !important;
+  align-items: center;
+  padding: 10px 16px;
+  clear: both;
+  font-weight: 500;
+  font-size: 0.9rem !important;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+  width: 100%;
+  line-height: normal !important;
+}
+
+ul.dropdown-menu > li > a:hover {
+  background-color: var(--sidebar-hover-bg);
+  color: var(--text-primary);
+}
+
+ul.dropdown-menu > li.divider {
+  height: 1px;
+  margin: 8px 0;
+  overflow: hidden;
+  background-color: var(--sidebar-border);
+  display: block;
+  width: 100%;
+}
+
+ul.dropdown-menu > li.divider > a {
+  display: none;
+  padding: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+ul.dropdown-menu svg.icon {
+  fill: var(--sidebar-text);
+  width: 18px;
+  height: 18px;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+/* Override Bootstrap pull-right */
+ul.dropdown-menu.pull-right {
+  right: 0;
+  left: auto;
 }
 
 .htop {
-  height:0px;
+  height: 0px;
 }
 
-/* -------------------------------------- */
-
+/* ========== Sidebar (L2) ========== */
 .menu-l2 {
-  width:0px;
-  height: 100%;
-  background-color:var(--bg-l2);
-  display:inline-block;
-  position:fixed;
-  top:46px;
-  z-index:1000;
+  width: var(--sidebar-w);
+  height: 100vh;
+  background-color: var(--sidebar-bg);
+  display: inline-block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1002;
   transition: all 0.3s ease-out;
-  box-shadow: 0 2px 4px 1px rgb(0 0 0 / 25%);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+  border-right: 1px solid var(--sidebar-border);
 }
 
 .menu-l2-inner {
-  height: calc(100% - 96px);
+  height: calc(100% - 0px - 60px);
+  margin-top: 60px;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: none; /* can also be: thin */
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+  padding: 12px 16px;
 }
 
 .menu-l2-inner::-webkit-scrollbar {
-  display: none;
+  width: 6px;
 }
 
+.menu-l2-inner::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.menu-l2-inner::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.menu-l2-inner::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Brand header */
+.sidebar-brand {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(var(--topbar-h)- 20px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border-bottom: 1px solid var(--sidebar-border);
+  background: var(--sidebar-bg);
+  z-index: 10;
+  overflow: hidden;
+}
+
+.sidebar-brand .brand-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.sidebar-brand .brand-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.sidebar-brand .brand-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Hide old title style */
 .menu-title-l2 {
-  text-indent: 1rem;
-  padding: 1em 0 0.75em 0;
-  margin: 0;
-  text-transform: capitalize;
-  color: var(--l2-title);
-  border-bottom: 1px solid var(--l2-border);
-  height:18px;
+  display: none !important;
 }
 
+/* Sidebar menu items */
 .menu-l2 ul {
-  list-style:none;
-  margin:0px;
-  padding:0px;
+  list-style: none;
+  margin: 0px;
+  padding: 0px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .menu-l2 li {
-  border-bottom: 1px solid var(--l2-border);
-  overflow:hidden;  
+  border-bottom: none;
+  overflow: hidden;
+  border-radius: 8px;
 }
 
 .menu-l2 li a {
-  text-decoration:none;
+  text-decoration: none;
 }
 
 .menu-l2 li div {
   text-decoration: none;
-  color: var(--l2-text);
-  display: block;
-  padding: 0.94rem;
-  cursor:pointer;
-  overflow:hidden;
+  color: var(--sidebar-text);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  overflow: hidden;
   white-space: nowrap;
-  transition: all 0.1s ease-out;
+  transition: all 0.15s ease;
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 8px;
 }
 
 .menu-l2 li div:hover {
-  background-color:var(--bg-l2-hover);
+  background-color: var(--sidebar-hover-bg);
 }
 
-.menu-l2 .active {
-  background-color:var(--bg-l2-active);
+/* Active item - modern accent color */
+.menu-l2 .active,
+.menu-l2 li div.active {
+  background-color: var(--sidebar-active-bg) !important;
+  color: var(--sidebar-active-text) !important;
+}
+
+.menu-l2 li div.active svg.icon {
+  fill: var(--sidebar-active-text) !important;
+}
+
+.menu-l2 li div svg.icon {
+  width: 20px;
+  height: 20px;
+  fill: var(--sidebar-text);
+  flex-shrink: 0;
 }
 
 .menu-text-l2 {
-  /*display:none;*/
+  flex: 1;
 }
 
+/* Expand/minimize controls at bottom of sidebar */
 #menu-l2-controls {
-  background-color:var(--bg-l2);
-  position: inherit;
+  background-color: var(--sidebar-bg);
+  position: absolute;
   bottom: 0;
+  left: 0;
+  width: 100%;
   text-decoration: none;
-  color: var(--l2-text);
-  display: block;
-  cursor:pointer;
-  overflow:hidden;
+  color: var(--sidebar-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
   transition: all 0.3s ease-out;
+  border-top: 1px solid var(--sidebar-border);
+  height: 60px;
 }
 
-.ctrl-exp {
-  padding: 15px 112px 15px 112px;
-}
-
-.ctrl-min {
-  padding: 15px 17px 15px 17px;
+.ctrl-exp svg.icon,
+.ctrl-min svg.icon {
+  width: 20px;
+  height: 20px;
+  fill: var(--sidebar-text);
 }
 
 .ctrl-hide {
-  padding: 15px 0 15px 0;
-  width: 0;
+  display: none;
 }
 
 #menu-l2-controls:hover {
-  background-color:var(--bg-l2-hover);
+  background-color: var(--sidebar-hover-bg);
 }
 
-/* -------------------------------------- */
-
+/* ========== L3 Menu (Disabled) ========== */
 .menu-l3 {
-  position:fixed;
-  top:46px;
-  left:0px;
-  width:0px;
+  display: none !important;
+  position: fixed;
+  top: 46px;
+  left: 0px;
+  width: 0px;
   height: calc(100% - 46px);
-  background-color:var(--bg-l3);
-  /*display:none;*/
-  z-index:999;
+  background-color: var(--bg-l3);
+  z-index: 999;
   overflow-y: auto;
   overflow-x: hidden;
   white-space: nowrap;
-  scrollbar-width: none; /* can also be: thin */
+  scrollbar-width: none;
   -ms-overflow-style: none;
   box-shadow: 0 2px 4px 1px rgb(0 0 0 / 25%);
   transition: all 0.3s ease-out;
@@ -214,9 +479,9 @@
 }
 
 .menu-l3 ul {
-  list-style:none;
-  margin:0px;
-  padding:0px;
+  list-style: none;
+  margin: 0px;
+  padding: 0px;
 }
 
 .menu-l3 li {
@@ -233,7 +498,7 @@
 }
 
 .menu-l3 li a:hover {
-  background-color:var(--bg-l2-hover);
+  background-color: var(--bg-l2-hover);
   color: var(--l3-text-hover);
 }
 
@@ -243,62 +508,94 @@
   color: var(--l3-text-active);
 }
 
-.l3-title { 
+.l3-title {
   color: var(--l3-title);
-  line-height:30px;
+  line-height: 30px;
 }
 
-/* -------------------------------------- */
+/* ========== Content Container ========== */
+.content-container {
+  margin-top: var(--topbar-h) !important;
+  margin-left: var(--sidebar-w);
+  margin-right: 0;
+  margin-bottom: 0;
+  transition: margin-left 0.3s ease-out;
+  background-color: var(--content-bg);
+  min-height: calc(100vh - var(--topbar-h));
+}
 
+/* ========== Mobile Responsive ========== */
 @media (max-width: 576px) {
-    .menu-l2 li div {
-      padding: 14px 17px 14px 17px;
-    }
+  .menu-top {
+    left: 0;
+    width: 100%;
+    padding: 0 16px;
+  }
+
+  .menu-l2 {
+    width: 0 !important;
+    border-right: none;
+  }
+
+  .menu-l2 li div {
+    padding: 10px 12px;
+  }
+
+  .content-container {
+    margin: var(--topbar-h) 0 0 0 !important;
+  }
+
+  .hamburger-menu {
+    display: flex;
+  }
 }
 
-/* -------------------------------------------------------------------
-Gravatar icon in toolbar
---------------------------------------------------------------------*/
-
-a.grav-container img.grav {
-  max-height: 1.2em;
-}
-a.grav-container img.grav {
-  border: 2px solid #ccc;
-}
-a.grav-container:hover img.grav {
-  border-color: #dedede;
-}
-.no-gravitar a.grav-container {
+/* ========== Gravatar icon in toolbar ========== */
+a.grav-container {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: #c5c5c5;
-  width: 1.36em;
-  height: 1.36em;
-  line-height: 1.37em;
-  border: 2px solid #ccc;
   overflow: hidden;
-  margin: 0.2em;
-  font-size:1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+a.grav-container:hover {
+  transform: scale(1.05);
+}
+
+a.grav-container img.grav {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 2px solid var(--sidebar-border);
+  border-radius: 50%;
+}
+
+a.grav-container:hover img.grav {
+  border-color: var(--sidebar-active-text);
+}
+
+.no-gravitar a.grav-container {
+  background: linear-gradient(135deg, #0c8599 0%, #0a6d7d 100%);
+  border: 2px solid var(--sidebar-border);
 }
 
 .no-gravitar a.grav-container:hover {
-  background: none;
+  background: linear-gradient(135deg, #0a6d7d 0%, #08525f 100%);
+  border-color: var(--sidebar-active-text);
 }
 
 .no-gravitar a.grav-container .icon.user {
-  font-size: 1.66em;
-  margin: 0 -.1em;
+  font-size: 1.2em;
+  fill: #fff;
+  width: 20px;
+  height: 20px;
 }
 
 .gravitar a.grav-container {
-  border-radius: 50%;
-  overflow: hidden;
-  padding: 6px;
-  font-size:1.5rem;
-  transition: all 0.1s ease-out;
+  padding: 0;
 }
-
-.gravitar a.grav-container:hover {
-  background: var(--bg-menu-top-hover);
-}
-

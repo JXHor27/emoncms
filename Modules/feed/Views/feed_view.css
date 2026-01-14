@@ -11,8 +11,14 @@ body{padding:0!important}
     cursor:pointer;
 }
 
-.controls { margin-bottom:10px; }
-#feeds-to-delete { font-style:italic; }
+/* Feed controls styling (matching input module) */
+.controls {
+    margin-bottom: 10px;
+}
+
+#feeds-to-delete {
+    font-style: italic;
+}
 
 #deleteFeedModalSelectedItems{
     position:absolute;
