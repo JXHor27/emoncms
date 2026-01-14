@@ -343,10 +343,7 @@ function http_request($method, $url, $data)
     $curl = curl_init();
     curl_setopt_array($curl, $options);
     $resp = curl_exec($curl);
-    if (PHP_VERSION_ID < 80000) {
-        // phpcs:ignore Generic.PHP.DeprecatedFunctions.Deprecated
-        curl_close($curl);
-    }
+    curl_close($curl);
     return $resp;
 }
 

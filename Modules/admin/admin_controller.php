@@ -14,7 +14,7 @@ defined('EMONCMS_EXEC') or die('Restricted access');
 
 function admin_controller()
 {
-    global $settings, $mysqli, $session, $route, $redis, $path, $log, $user;
+    global $settings, $mysqli, $session, $route, $redis, $path, $log;
 
     if (!$session['write']) {
         return array('success'=>false, 'content'=>'', 'reauth'=>true, 'message'=>"Admin re-authentication required");

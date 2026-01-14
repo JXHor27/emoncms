@@ -413,14 +413,7 @@
 
             if (!isset($dbinputs[$nodeid])) {
                 $dbinputs[$nodeid] = array();
-                if ($device && method_exists($device,"create")) {
-                    if ($input->is_creation_disabled($userid)) {
-                        $log->warn("Input creation is disabled, cannot create device for nodeid: ".$nodeid);
-                    } else {
-                        $log->info("Creating device for nodeid: ".$nodeid);
-                        $device->create($userid,$nodeid,null,null,null);
-                    }
-                }
+                if ($device && method_exists($device,"create")) $device->create($userid,$nodeid,null,null,null);
             }
 
             $tmp = array();
@@ -450,19 +443,12 @@
                 else
                 {
                     if (!isset($dbinputs[$nodeid][$name])) {
-                        if ($input->is_creation_disabled($userid)) {
-                            $log->warn("Input creation is disabled, cannot create input: ".$name." for nodeid: ".$nodeid);
-                            continue;
-                        } else {
-                            $log->info("Creating input: ".$name." for nodeid: ".$nodeid);
-                            $inputid = $input->create_input($userid, $nodeid, $name);
-                            if (!$inputid) {
-                                $log->warn("error creating input");
-                                continue;
-                            }
-                            $dbinputs[$nodeid][$name] = array('id'=>$inputid);
-                            $input->set_timevalue($dbinputs[$nodeid][$name]['id'],$time,$value);
+                        $inputid = $input->create_input($userid, $nodeid, $name);
+                        if (!$inputid) {
+                            $log->warn("error creating input"); die;
                         }
+                        $dbinputs[$nodeid][$name] = array('id'=>$inputid);
+                        $input->set_timevalue($dbinputs[$nodeid][$name]['id'],$time,$value);
                     } else {
                         $inputid = $dbinputs[$nodeid][$name]['id'];
                         $input->set_timevalue($dbinputs[$nodeid][$name]['id'],$time,$value);
