@@ -219,12 +219,19 @@ var app = new Vue({
             }
         },
         show_device_key: function(device) {
-            var devicekey = _("Please install the device module to enable this feature");
-            if(DEVICE_MODULE) {
-                devicekey = device.devicekey;
-                if (devicekey === "") devicekey = _("No device key created");
+            if (typeof device_key_modal !== 'undefined') {
+                var devicekey = _("Please install the device module to enable this feature");
+                var hasKey = false;
+                if(DEVICE_MODULE) {
+                    devicekey = device.devicekey;
+                    hasKey = devicekey !== "";
+                    if (devicekey === "") devicekey = _("No device key created");
+                }
+                device_key_modal.devicekey = devicekey;
+                device_key_modal.deviceName = device.name || device.nodeid;
+                device_key_modal.hasKey = hasKey;
+                device_key_modal.openModal();
             }
-            alert(devicekey)
         },
         create_device: function() {
             if(DEVICE_MODULE && typeof device_templates !== 'undefined') {
@@ -291,21 +298,39 @@ var app = new Vue({
         },
         enableInputCreation: function() {
             var self = this;
-            $.get(path + "input/enable.json").done(function(response) {
+            $.get(path + "input/enable.json")
+            .done(function(response) {
                 if (response === true || response.success === true) {
                     self.input_creation_disabled = false;
+                    self.showNotification(_("Input creation enabled. New inputs and devices will now appear automatically."), 'success', 4000);
+                } else {
+                    self.showNotification(_("Failed to enable input creation."), 'error', 4000);
                 }
+            })
+            .fail(function() {
+                self.showNotification(_("Error enabling input creation. Please try again."), 'error', 4000);
             });
         },
         disableInputCreation: function() {
-            var self = this;
-            if (confirm("Are you sure you want to disable further input creation? New inputs and devices will not appear automatically until re-enabled. This can be useful if spurious inputs are being created.")) {
-                $.get(path + "input/disable.json").done(function(response) {
-                    if (response === true || response.success === true) {
-                        self.input_creation_disabled = true;
-                    }
-                });
+            // Open the confirmation modal instead of using confirm()
+            if (typeof disable_input_creation_modal !== 'undefined') {
+                disable_input_creation_modal.openModal();
             }
+        },
+        confirmDisableInputCreation: function() {
+            var self = this;
+            $.get(path + "input/disable.json")
+            .done(function(response) {
+                if (response === true || response.success === true) {
+                    self.input_creation_disabled = true;
+                    self.showNotification(_("Input creation disabled. New inputs will no longer appear automatically."), 'warning', 4000);
+                } else {
+                    self.showNotification(_("Failed to disable input creation."), 'error', 4000);
+                }
+            })
+            .fail(function() {
+                self.showNotification(_("Error disabling input creation. Please try again."), 'error', 4000);
+            });
         },
         showNotification: function(message, type, duration) {
             type = type || 'info'; // 'info', 'warning', 'error', 'success'
@@ -450,14 +475,29 @@ var controls = new Vue({
                 msg += "?";
             }
 
-            if (confirm(msg)) {
-                //call device/clean.json result is plain text
-                $.get(path+"device/clean.json?active="+inactive_input_timeout).done( function(response) {
-                    alert(response);
-                });
-
+            // Store the message and open confirmation modal
+            if (typeof clean_inputs_modal !== 'undefined') {
+                clean_inputs_modal.message = msg;
+                clean_inputs_modal.openModal();
             }
 
+        },
+        confirmCleanUnused: function() {
+            var self = this;
+            //call device/clean.json result is plain text
+            $.get(path+"device/clean.json?active="+inactive_input_timeout)
+            .done(function(response) {
+                if (typeof app !== 'undefined' && app.showNotification) {
+                    app.showNotification(response, 'success', 5000);
+                }
+                // Refresh the list
+                update();
+            })
+            .fail(function() {
+                if (typeof app !== 'undefined' && app.showNotification) {
+                    app.showNotification(_("Error cleaning unused inputs"), 'error', 4000);
+                }
+            });
         }
     },
     watch: {
@@ -486,8 +526,10 @@ var delete_input = new Vue({
     data: {
         hidden: true,
         buttonLabel: _('Delete'),
-        buttonClass: 'btn-primary',
-        success: false
+        buttonClass: 'btn-danger',
+        success: false,
+        message: '',
+        deleting: false
     },
     computed: {
         total_inputs: function() {
@@ -509,29 +551,43 @@ var delete_input = new Vue({
     methods: {
         confirm: function(event) {
             var vm = this;
+            vm.deleting = true;
+            vm.message = _('Deleting inputs...');
+            
             input.delete_multiple_async(this.selected)
             .done(function() {
-                // if all device inputs deleted, then delete the device
-                vm.buttonLabel = _('Deleted')
-                vm.buttonClass = 'btn-success'
-                vm.success = true
-                // wait for user to read response, then update & close modal
+                vm.message = _('Inputs deleted successfully');
+                vm.success = true;
+                
+                // Show success notification
+                if (typeof app !== 'undefined' && app.showNotification) {
+                    app.showNotification(_('Inputs deleted successfully'), 'success', 3000);
+                }
+                
+                // Update and close modal
                 setTimeout(function() {
                     update().done(function() {
                         // remove empty devices
                         vm.removeEmptyDevices()
                         .then(function() {
-                            // all empty devices removed
-                            vm.closeModal()
+                            vm.closeModal();
                         })
-                    })
-                }, 1000)
+                        .fail(function() {
+                            // No empty devices or error, just close
+                            vm.closeModal();
+                        });
+                    });
+                }, 1000);
             })
             .fail(function(xhr, type, error){
-                vm.buttonLabel = _('Error')
-                vm.buttonClass = 'btn-warning'
-                vm.success = false
-            })
+                vm.message = _('Error deleting inputs: ') + error;
+                vm.success = false;
+                vm.deleting = false;
+                
+                if (typeof app !== 'undefined' && app.showNotification) {
+                    app.showNotification(_('Error deleting inputs: ') + error, 'error', 5000);
+                }
+            });
         },
         removeEmptyDevices: function() {
             // remove any devices without inputs
@@ -591,6 +647,10 @@ var delete_input = new Vue({
             this.hidden = true
             this.errors = {}
             this.message = ''
+            this.success = false
+            this.deleting = false
+            this.buttonLabel = _('Delete')
+            this.buttonClass = 'btn-danger'
             // remove ESC keypress event
             document.removeEventListener('keydown', this.escape)
         },
@@ -598,8 +658,10 @@ var delete_input = new Vue({
             this.hidden = false
             this.errors = {}
             this.message = ''
-            this.buttonLabel = _('Delete'),
-            this.buttonClass = 'btn-primary'
+            this.success = false
+            this.deleting = false
+            this.buttonLabel = _('Delete')
+            this.buttonClass = 'btn-danger'
             app.paused = true
             document.addEventListener("keydown", this.escape);
         },
@@ -845,6 +907,114 @@ var edit_input = new Vue({
 });
 
 
+// Modal for disabling input creation confirmation
+var disable_input_creation_modal = new Vue({
+    el: '#disableInputCreationModal',
+    data: {
+        hidden: true
+    },
+    methods: {
+        confirm: function() {
+            app.confirmDisableInputCreation();
+            this.closeModal();
+        },
+        closeModal: function() {
+            this.hidden = true;
+            document.removeEventListener('keydown', this.escape);
+        },
+        openModal: function() {
+            this.hidden = false;
+            document.addEventListener("keydown", this.escape);
+        },
+        escape: function(event) {
+            if (event.keyCode == 27) {
+                if(typeof this.closeModal !== 'undefined') {
+                    this.closeModal();
+                }
+            }
+        }
+    }
+});
+
+
+// Modal for cleaning unused inputs confirmation
+var clean_inputs_modal = new Vue({
+    el: '#cleanInputsModal',
+    data: {
+        hidden: true,
+        message: ''
+    },
+    methods: {
+        confirm: function() {
+            controls.confirmCleanUnused();
+            this.closeModal();
+        },
+        closeModal: function() {
+            this.hidden = true;
+            this.message = '';
+            document.removeEventListener('keydown', this.escape);
+        },
+        openModal: function() {
+            this.hidden = false;
+            document.addEventListener("keydown", this.escape);
+        },
+        escape: function(event) {
+            if (event.keyCode == 27) {
+                if(typeof this.closeModal !== 'undefined') {
+                    this.closeModal();
+                }
+            }
+        }
+    }
+});
+
+
+// Modal for showing device key
+var device_key_modal = new Vue({
+    el: '#deviceKeyModal',
+    data: {
+        hidden: true,
+        devicekey: '',
+        deviceName: '',
+        hasKey: false
+    },
+    methods: {
+        copyToClipboard: function() {
+            var textArea = this.$refs.deviceKeyInput;
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                if (typeof app !== 'undefined' && app.showNotification) {
+                    app.showNotification(_("Device key copied to clipboard"), 'success', 2000);
+                }
+            } catch(err) {
+                if (typeof app !== 'undefined' && app.showNotification) {
+                    app.showNotification(_("Failed to copy to clipboard"), 'error', 2000);
+                }
+            }
+        },
+        closeModal: function() {
+            this.hidden = true;
+            this.devicekey = '';
+            this.deviceName = '';
+            this.hasKey = false;
+            document.removeEventListener('keydown', this.escape);
+        },
+        openModal: function() {
+            this.hidden = false;
+            document.addEventListener("keydown", this.escape);
+        },
+        escape: function(event) {
+            if (event.keyCode == 27) {
+                if(typeof this.closeModal !== 'undefined') {
+                    this.closeModal();
+                }
+            }
+        }
+    }
+});
+
+
 /**
  * get the key/property. only returns the last found.
  * @param {*} newValue 
@@ -1007,8 +1177,11 @@ function update_inputs() {
                     // Device creation
                     $.ajax({ url: path+"device/create.json?nodeid="+nodeid, dataType: 'json', async: false, success: function(result) {
                         if (result.success!=undefined) {
-                            //alert("There was an error creating device: nodeid="+nodeid+" message="+result.message); 
-                            console.error("There was an error creating device: nodeid="+nodeid+" message="+result.message);
+                            if (typeof app !== 'undefined' && app.showNotification) {
+                                app.showNotification(_("Error creating device: ") + nodeid + " - " + result.message, 'error', 5000);
+                            } else {
+                                alert(_("There was an error creating device: nodeid=") + nodeid + " message=" + result.message);
+                            }
                         } else {
                             devices[nodeid].id = result;
                             devices[nodeid].devicekey = "";
@@ -1072,7 +1245,8 @@ function draw_devices() {
     for (var nodeid in devices) {
     
         if (devices[nodeid].nodeid.length > max_name_length) max_name_length = devices[nodeid].nodeid.length;
-        if (devices[nodeid].description.length > max_description_length) max_description_length = devices[nodeid].description.length;
+        var deviceDesc = formatDescription(devices[nodeid].description);
+        if (deviceDesc.length > max_description_length) max_description_length = deviceDesc.length;
         
         var oldest_time = 0;
         var device_oldest_input = null;
@@ -1097,8 +1271,10 @@ function draw_devices() {
             var value_str = list_format_value(input.value);
             input.value_str = value_str
             
+            input.description_formatted = formatDescription(input.description);
+            
             if (input.name.length>max_name_length) max_name_length = input.name.length;
-            if (input.description.length>max_description_length) max_description_length = input.description.length;
+            if (input.description_formatted.length>max_description_length) max_description_length = input.description_formatted.length;
             if (String(fv.value).length>max_time_length) max_time_length = String(fv.value).length;
             if (String(value_str).length>max_value_length) max_value_length = String(value_str).length;  
         }
@@ -1306,17 +1482,26 @@ function device_delete() {
         if (response.hasOwnProperty('success') && response.success === false) {
             // api action failed
             if(response.message) {
-                alert(response.message)
+                if (typeof app !== 'undefined' && app.showNotification) {
+                    app.showNotification(response.message, 'error', 5000);
+                } else {
+                    alert(response.message);
+                }
             }
         } else {
             // success
             $('#device-config-modal .modal-footer [data-dismiss="modal"]').click()
-            update().done(function(update_response){
-                console.log(update_response)
-            })
+            if (typeof app !== 'undefined' && app.showNotification) {
+                app.showNotification(_("Device deleted successfully"), 'success', 3000);
+            }
+            update();
         }
     }).fail(function(message){
-        console.error(message)
+        if (typeof app !== 'undefined' && app.showNotification) {
+            app.showNotification(_("Error deleting device: ") + message, 'error', 5000);
+        } else {
+            alert(_("Error deleting device: ") + message);
+        }
     })
 }
 
@@ -1555,14 +1740,29 @@ $(function(){
             //docCookies.setItem(local_cache_key, JSON.stringify(nodes_display));
             firstLoad = false;
         }
-        console.log(event.target.dataset.node,nodes_display)
     })
 })
 
 
 // Check if input creation is disabled for the user
-$.get(path + "input/isdisabled.json").done(function(response) {
+$.get(path + "input/isdisabled.json")
+.done(function(response) {
     if (typeof app !== 'undefined') {
-        app.input_creation_disabled = response === true || response.disabled === true;
+        var isDisabled = response === true || response.disabled === true;
+        app.input_creation_disabled = isDisabled;
+        
+        // Inform user if input creation is disabled
+        if (isDisabled) {
+            setTimeout(function() {
+                if (typeof app !== 'undefined' && app.showNotification) {
+                    app.showNotification(_("Input creation is currently disabled. Enable it to allow new inputs."), 'info', 5000);
+                }
+            }, 1000); // Delay to ensure app is fully loaded
+        }
+    }
+})
+.fail(function() {
+    if (typeof app !== 'undefined' && app.showNotification) {
+        app.showNotification(_("Unable to check input creation status."), 'warning', 3000);
     }
 });
